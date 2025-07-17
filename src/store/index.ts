@@ -1,47 +1,50 @@
 import { createStore } from "vuex";
 import router from "../router";
 
-// Interfejsy danych (pozostałe bez zmian)
 interface User {
   email: string;
 }
 
+export type ExerciseCategory =
+  | "strength"
+  | "cardio"
+  | "flexibility"
+  | "recovery";
+
 export interface ExerciseType {
   id: string;
   name: string;
-  category: "cardio" | "strength";
+  category: ExerciseCategory;
   description: string;
   imageUrl?: string;
 }
 
-// NOWY INTERFEJS DLA SERII SIŁOWYCH
 export interface Set {
-  id: string; // Unikalne ID dla każdej serii
-  weight: number | null; // waga w kg
-  reps: number | null; // powtórzenia w serii
-  done: boolean; // Czy seria została wykonana
+  id: string;
+  weight: number | null;
+  reps: number | null;
+  done: boolean;
 }
 
 export interface PlannedExercise {
-  id: string; // ID konkretnego zaplanowanego ćwiczenia (unikalne dla planu)
+  id: string;
   exerciseTypeId: string;
   name: string;
-  category: "cardio" | "strength";
-  // Parametry treningowe
-  sets?: Set[]; // Zmieniamy z liczby serii na TABLICĘ OBIEKTÓW SERII dla strength
-  duration?: number | null; // długość w minutach (dla kardio)
-  done: boolean; // Czy całe ćwiczenie zostało zakończone (opcjonalne, ale przydatne)
+  category: ExerciseCategory;
+  done: boolean;
+  sets?: Set[];
+  duration?: number | null;
+  reps?: number | null;
 }
 
 export interface TrainingRecord {
   id: string;
   date: string;
   exercises: PlannedExercise[];
-  totalDuration?: number;
 }
 
 interface State {
-  user: User | null;
+  currentUser: User | null;
   exerciseTypes: ExerciseType[];
   currentTraining: PlannedExercise[];
   trainingHistory: TrainingRecord[];
@@ -50,15 +53,15 @@ interface State {
 
 export default createStore<State>({
   state: {
-    user: null,
+    currentUser: null,
     exerciseTypes: [],
     currentTraining: [],
     trainingHistory: [],
     userStats: {},
   },
   getters: {
-    isAuthenticated: (state) => !!state.user,
-    currentUser: (state) => state.user,
+    isAuthenticated: (state) => !!state.currentUser,
+    currentUser: (state) => state.currentUser,
     allExerciseTypes: (state) => state.exerciseTypes,
     getExerciseTypeById: (state) => (id: string) =>
       state.exerciseTypes.find((type) => type.id === id),
@@ -67,18 +70,25 @@ export default createStore<State>({
     getUserStats: (state) => state.userStats,
   },
   mutations: {
-    // ... (Mutacje dotyczące autentykacji, setExerciseTypes, addExerciseType - bez zmian)
     setUser(state, user: User | null) {
-      /* ... */
+      state.currentUser = user;
+      if (user) {
+        localStorage.setItem("currentUser", JSON.stringify(user));
+      } else {
+        localStorage.removeItem("currentUser");
+      }
     },
     setExerciseTypes(state, types: ExerciseType[]) {
-      /* ... */
+      state.exerciseTypes = types;
+      localStorage.setItem("exerciseTypes", JSON.stringify(types));
     },
     addExerciseType(state, type: ExerciseType) {
-      /* ... */
+      state.exerciseTypes.push(type);
+      localStorage.setItem(
+        "exerciseTypes",
+        JSON.stringify(state.exerciseTypes)
+      );
     },
-
-    // --- Bieżący trening (aktualizujemy) ---
     setCurrentTraining(state, exercises: PlannedExercise[]) {
       state.currentTraining = exercises;
       localStorage.setItem("currentTraining", JSON.stringify(exercises));
@@ -111,7 +121,6 @@ export default createStore<State>({
         );
       }
     },
-    // NOWA MUTACJA: Dodanie serii do ćwiczenia siłowego
     addSetToExercise(
       state,
       { exerciseId, newSet }: { exerciseId: string; newSet: Set }
@@ -128,7 +137,6 @@ export default createStore<State>({
         );
       }
     },
-    // NOWA MUTACJA: Aktualizacja serii w ćwiczeniu siłowym
     updateSetInExercise(
       state,
       { exerciseId, updatedSet }: { exerciseId: string; updatedSet: Set }
@@ -145,7 +153,6 @@ export default createStore<State>({
         }
       }
     },
-    // NOWA MUTACJA: Usunięcie serii z ćwiczenia siłowego
     removeSetFromExercise(
       state,
       { exerciseId, setId }: { exerciseId: string; setId: string }
@@ -159,42 +166,111 @@ export default createStore<State>({
         );
       }
     },
-
-    // ... (Mutacje dotyczące historii i statystyk - bez zmian, bo `PlannedExercise` jest używany)
     addTrainingToHistory(state, training: TrainingRecord) {
-      /* ... */
+      state.trainingHistory.push(training);
+      localStorage.setItem(
+        "trainingHistory",
+        JSON.stringify(state.trainingHistory)
+      );
+      state.currentTraining = [];
+      localStorage.removeItem("currentTraining");
     },
     setTrainingHistory(state, history: TrainingRecord[]) {
-      /* ... */
+      state.trainingHistory = history;
+      localStorage.setItem("trainingHistory", JSON.stringify(history));
     },
     setUserStats(state, stats: any) {
-      /* ... */
+      state.userStats = stats;
+      localStorage.setItem("userStats", JSON.stringify(stats));
     },
   },
   actions: {
-    // ... (Akcje autentykacji i initializeData - bez zmian)
     initializeAuth({ commit }) {
-      /* ... */
+      const storedUser = localStorage.getItem("currentUser");
+      if (storedUser) {
+        try {
+          commit("setUser", JSON.parse(storedUser));
+        } catch (e) {
+          console.error(
+            "Błąd podczas ładowania użytkownika z localStorage:",
+            e
+          );
+          commit("setUser", null);
+        }
+      }
     },
-    register({ commit }, { email, password }: any) {
-      /* ... */
+    async register({ commit }, { email, password }: any) {
+      const existingUsers = JSON.parse(
+        localStorage.getItem("registeredUsers") || "[]"
+      );
+      if (existingUsers.some((u: any) => u.email === email)) {
+        throw new Error("Użytkownik o podanym adresie email już istnieje.");
+      }
+      if (password.length < 6) {
+        throw new Error("Hasło musi mieć co najmniej 6 znaków.");
+      }
+      const newUser = { email, password };
+      existingUsers.push(newUser);
+      localStorage.setItem("registeredUsers", JSON.stringify(existingUsers));
     },
-    login({ commit }, { email, password }: any) {
-      /* ... */
+    async login({ commit }, { email, password }: any) {
+      const registeredUsers = JSON.parse(
+        localStorage.getItem("registeredUsers") || "[]"
+      );
+      const userFound = registeredUsers.find(
+        (u: any) => u.email === email && u.password === password
+      );
+
+      if (userFound) {
+        const user: User = { email: userFound.email };
+        commit("setUser", user);
+        router.push({ name: "welcome" });
+      } else {
+        throw new Error("Nieprawidłowy email lub hasło.");
+      }
     },
-    logout({ commit }) {
-      /* ... */
+    async logout({ commit }) {
+      commit("setUser", null);
+      router.push({ name: "home" });
     },
     initializeData({ commit }) {
-      /* ... */
+      const storedExerciseTypes = localStorage.getItem("exerciseTypes");
+      if (storedExerciseTypes) {
+        try {
+          commit("setExerciseTypes", JSON.parse(storedExerciseTypes));
+        } catch (e) {
+          console.error("Błąd ładowania typów ćwiczeń:", e);
+        }
+      }
+      const storedCurrentTraining = localStorage.getItem("currentTraining");
+      if (storedCurrentTraining) {
+        try {
+          commit("setCurrentTraining", JSON.parse(storedCurrentTraining));
+        } catch (e) {
+          console.error("Błąd ładowania bieżącego treningu:", e);
+        }
+      }
+      const storedTrainingHistory = localStorage.getItem("trainingHistory");
+      if (storedTrainingHistory) {
+        try {
+          commit("setTrainingHistory", JSON.parse(storedTrainingHistory));
+        } catch (e) {
+          console.error("Błąd ładowania historii treningów:", e);
+        }
+      }
+      const storedUserStats = localStorage.getItem("userStats");
+      if (storedUserStats) {
+        try {
+          commit("setUserStats", JSON.parse(storedUserStats));
+        } catch (e) {
+          console.error("Błąd ładowania statystyk użytkownika:", e);
+        }
+      }
     },
-
-    // --- Akcje dla typów ćwiczeń (bez zmian) ---
     addExerciseType({ commit }, type: Omit<ExerciseType, "id">) {
-      /* ... */
+      const newType: ExerciseType = { ...type, id: Date.now().toString() };
+      commit("addExerciseType", newType);
     },
-
-    // --- Akcje dla bieżącego treningu (aktualizujemy) ---
     addExerciseToPlan(
       { commit, getters },
       { exerciseTypeId, params }: { exerciseTypeId: string; params: any }
@@ -208,13 +284,12 @@ export default createStore<State>({
         exerciseTypeId: exerciseType.id,
         name: exerciseType.name,
         category: exerciseType.category,
-        done: false, // Domyślnie ćwiczenie jako całość jest "niezrobione"
+        done: false,
+        ...params,
       };
 
-      if (exerciseType.category === "strength") {
-        newPlannedExercise.sets = []; // Dla siłowych, początkowo pusta tablica serii
-      } else if (exerciseType.category === "cardio") {
-        newPlannedExercise.duration = params.duration; // Dla kardio, długość
+      if (newPlannedExercise.category === "strength") {
+        newPlannedExercise.sets = [];
       }
       commit("addExerciseToCurrentTraining", newPlannedExercise);
     },
@@ -224,7 +299,6 @@ export default createStore<State>({
     updateExerciseInPlan({ commit }, updatedExercise: PlannedExercise) {
       commit("updatePlannedExercise", updatedExercise);
     },
-    // NOWA AKCJA: Dodanie serii do ćwiczenia
     addSet(
       { commit },
       {
@@ -241,67 +315,67 @@ export default createStore<State>({
       };
       commit("addSetToExercise", { exerciseId, newSet });
     },
-    // NOWA AKCJA: Aktualizacja serii
     updateSet(
       { commit },
       { exerciseId, updatedSet }: { exerciseId: string; updatedSet: Set }
     ) {
       commit("updateSetInExercise", { exerciseId, updatedSet });
     },
-    // NOWA AKCJA: Usunięcie serii
     removeSet(
       { commit },
       { exerciseId, setId }: { exerciseId: string; setId: string }
     ) {
       commit("removeSetFromExercise", { exerciseId, setId });
     },
-
-    // --- Akcje dla zakończenia treningu (aktualizujemy) ---
     finishCurrentTraining({ commit, state }) {
       const currentTrainingExercises = state.currentTraining;
-
-      // Sprawdzamy, czy jakieś ćwiczenie zostało w ogóle rozpoczęte/zaznaczone
       const hasAnyExerciseDone = currentTrainingExercises.some((ex) => {
         if (ex.category === "strength" && ex.sets) {
-          return ex.sets.some((s) => s.done); // Czy choć jedna seria wykonana
-        } else if (ex.category === "cardio") {
-          return ex.done; // Czy kardio wykonane
+          return ex.sets.some((s) => s.done);
+        } else {
+          return ex.done;
         }
-        return false;
       });
 
       if (!hasAnyExerciseDone) {
         throw new Error(
-          "Musisz wykonać co najmniej jedną serię ćwiczenia siłowego lub jedno ćwiczenie kardio, aby zakończyć trening."
+          "Musisz wykonać co najmniej jedno ćwiczenie, aby zakończyć trening."
         );
       }
 
-      // Możesz też zdecydować, czy zapisać tylko te zrobione, czy wszystkie z flagami.
-      // Na razie: zapisujemy cały plan, ale zaktualizowany status "done" dla poszczególnych serii/ćwiczeń.
       const newTrainingRecord: TrainingRecord = {
         id: Date.now().toString(),
         date: new Date().toISOString().split("T")[0],
-        exercises: JSON.parse(JSON.stringify(currentTrainingExercises)), // Głęboka kopia, by nie mutować bieżącego stanu
+        exercises: JSON.parse(JSON.stringify(currentTrainingExercises)),
       };
       commit("addTrainingToHistory", newTrainingRecord);
 
-      // Aktualizacja statystyk
       const currentStats = state.userStats;
       currentStats.totalTrainings = (currentStats.totalTrainings || 0) + 1;
-      // Obliczanie totalExercisesDone może być bardziej złożone teraz, np. liczba wykonanych serii
       let completedSetsCount = 0;
       let completedCardioCount = 0;
+      let completedFlexibilityCount = 0;
+      let completedRecoveryCount = 0; // NOWA STATYSTYKA
       currentTrainingExercises.forEach((ex) => {
         if (ex.category === "strength" && ex.sets) {
           completedSetsCount += ex.sets.filter((s) => s.done).length;
         } else if (ex.category === "cardio" && ex.done) {
           completedCardioCount++;
+        } else if (ex.category === "flexibility" && ex.done) {
+          completedFlexibilityCount++;
+        } else if (ex.category === "recovery" && ex.done) {
+          completedRecoveryCount++;
         }
       });
       currentStats.totalCompletedSets =
         (currentStats.totalCompletedSets || 0) + completedSetsCount;
       currentStats.totalCompletedCardio =
         (currentStats.totalCompletedCardio || 0) + completedCardioCount;
+      currentStats.totalCompletedFlexibility =
+        (currentStats.totalCompletedFlexibility || 0) +
+        completedFlexibilityCount;
+      currentStats.totalCompletedRecovery =
+        (currentStats.totalCompletedRecovery || 0) + completedRecoveryCount;
 
       commit("setUserStats", currentStats);
     },

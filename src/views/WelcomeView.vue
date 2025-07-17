@@ -80,6 +80,33 @@
                   @input="updateExerciseInStore(exercise)"
               /></label>
             </template>
+
+            <template v-else-if="exercise.category === 'flexibility'">
+              <label v-if="exercise.reps"
+                >Powtórzenia:
+                <input
+                  type="number"
+                  v-model.number="exercise.reps"
+                  @input="updateExerciseInStore(exercise)"
+              /></label>
+              <label v-if="exercise.duration"
+                >Długość (min):
+                <input
+                  type="number"
+                  v-model.number="exercise.duration"
+                  @input="updateExerciseInStore(exercise)"
+              /></label>
+            </template>
+
+            <template v-else-if="exercise.category === 'recovery'">
+              <label
+                >Długość (min):
+                <input
+                  type="number"
+                  v-model.number="exercise.duration"
+                  @input="updateExerciseInStore(exercise)"
+              /></label>
+            </template>
           </div>
         </li>
       </ul>
@@ -106,6 +133,7 @@
         <button @click="goToExerciseTypes" class="nav-button">
           Typy ćwiczeń
         </button>
+        <button @click="goToStats" class="nav-button">Statystyki</button>
       </div>
     </div>
   </div>
@@ -115,7 +143,7 @@
 import { defineComponent, computed, ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { PlannedExercise, Set } from "@/store"; // Importujemy interfejs Set
+import { PlannedExercise, Set } from "@/store";
 
 export default defineComponent({
   name: "WelcomeView",
@@ -131,34 +159,34 @@ export default defineComponent({
     );
     const finishTrainingError = ref<string | null>(null);
 
-    // Metoda wylogowania
     const handleLogout = () => {
       store.dispatch("logout");
     };
 
-    // Przełączanie statusu 'done' dla całego ćwiczenia (np. dla kardio)
     const toggleExerciseDone = (exerciseId: string) => {
       const exercise = currentTraining.value.find((ex) => ex.id === exerciseId);
-      if (exercise && exercise.category === "cardio") {
-        // Tylko dla kardio na tym poziomie
-        const updatedExercise = { ...exercise, done: !exercise.done };
-        store.dispatch("updateExerciseInPlan", updatedExercise);
-      } else if (exercise && exercise.category === "strength") {
-        // Dla siłowych, to pole 'done' będzie miało sens gdy wszystkie serie będą zrobione
-        // Na razie ten checkbox może ustawiać/resetować done dla WSZYSTKICH serii
-        const newDoneStatus = !exercise.done; // Zmieniamy status całego ćwiczenia
-        const updatedSets =
-          exercise.sets?.map((s) => ({ ...s, done: newDoneStatus })) || [];
-        const updatedExercise = {
-          ...exercise,
-          done: newDoneStatus,
-          sets: updatedSets,
-        };
-        store.dispatch("updateExerciseInPlan", updatedExercise);
+      if (exercise) {
+        if (
+          exercise.category === "cardio" ||
+          exercise.category === "flexibility" ||
+          exercise.category === "recovery"
+        ) {
+          const updatedExercise = { ...exercise, done: !exercise.done };
+          store.dispatch("updateExerciseInPlan", updatedExercise);
+        } else if (exercise.category === "strength") {
+          const newDoneStatus = !exercise.done;
+          const updatedSets =
+            exercise.sets?.map((s) => ({ ...s, done: newDoneStatus })) || [];
+          const updatedExercise = {
+            ...exercise,
+            done: newDoneStatus,
+            sets: updatedSets,
+          };
+          store.dispatch("updateExerciseInPlan", updatedExercise);
+        }
       }
     };
 
-    // Przełączanie statusu 'done' dla konkretnej serii (siłowe)
     const toggleSetDone = (exerciseId: string, setId: string) => {
       const exercise = currentTraining.value.find((ex) => ex.id === exerciseId);
       if (exercise && exercise.category === "strength" && exercise.sets) {
@@ -167,8 +195,6 @@ export default defineComponent({
           const updatedSet = { ...set, done: !set.done };
           store.dispatch("updateSet", { exerciseId, updatedSet });
 
-          // Opcjonalnie: Zaktualizuj status 'done' całego ćwiczenia siłowego
-          // jeśli wszystkie jego serie są zrobione/niezrobione
           const allSetsDone = exercise.sets.every((s) => s.done);
           if (exercise.done !== allSetsDone) {
             store.dispatch("updateExerciseInPlan", {
@@ -180,42 +206,30 @@ export default defineComponent({
       }
     };
 
-    // Dodawanie serii do ćwiczenia siłowego
     const addSet = (exerciseId: string) => {
       store.dispatch("addSet", { exerciseId, weight: null, reps: null });
     };
 
-    // Aktualizacja pojedynczej serii (inputy)
     const updateSetInStore = (exerciseId: string, set: Set) => {
-      // Ta funkcja jest wywoływana za każdym razem, gdy zmienisz input.
-      // Używamy opóźnienia, aby nie wywoływać mutacji Vuex zbyt często,
-      // ale v-model.number na computed property z setterem jest czystszym rozwiązaniem.
-      // Na potrzeby tego demo, możemy polegać na reaktywności Vuex, ale warto to wiedzieć.
-      // Domyślne `v-model` z `computed` property, wymaga `setter` żeby działało.
-      // Tu używamy `@input` co oznacza, że musimy ręcznie wysłać akcję.
       store.dispatch("updateSet", { exerciseId, updatedSet: set });
     };
 
-    // Aktualizacja ćwiczenia (np. długość dla kardio)
     const updateExerciseInStore = (exercise: PlannedExercise) => {
       store.dispatch("updateExerciseInPlan", exercise);
     };
 
-    // Usuwanie serii z ćwiczenia siłowego
     const removeSet = (exerciseId: string, setId: string) => {
       if (confirm("Czy na pewno chcesz usunąć tę serię?")) {
         store.dispatch("removeSet", { exerciseId, setId });
       }
     };
 
-    // Usuwanie całego ćwiczenia z planu
     const removeExercise = (exerciseId: string) => {
       if (confirm("Czy na pewno chcesz usunąć to ćwiczenie z planu?")) {
         store.dispatch("removeExerciseFromPlan", exerciseId);
       }
     };
 
-    // Zakończenie treningu
     const finishTraining = async () => {
       finishTrainingError.value = null;
       try {
@@ -228,7 +242,6 @@ export default defineComponent({
       }
     };
 
-    // Metody nawigacji
     const goToAddExercise = () => {
       router.push({ name: "add-exercise" });
     };
@@ -241,6 +254,10 @@ export default defineComponent({
       router.push({ name: "exercise-types" });
     };
 
+    const goToStats = () => {
+      router.push({ name: "stats" });
+    };
+
     return {
       userEmail,
       currentTraining,
@@ -250,20 +267,20 @@ export default defineComponent({
       toggleSetDone,
       addSet,
       updateSetInStore,
-      updateExerciseInStore, // Nowa metoda dla kardio
+      updateExerciseInStore,
       removeSet,
       removeExercise,
       finishTraining,
       goToAddExercise,
       goToHistory,
       goToExerciseTypes,
+      goToStats,
     };
   },
 });
 </script>
 
 <style scoped>
-/* Pozostałe style z poprzedniego kroku, dodajemy nowe dla serii */
 .welcome-container {
   padding: 20px;
   text-align: center;
@@ -306,7 +323,6 @@ hr {
   margin: 40px 0;
 }
 
-/* Sekcja Najbliższy Trening */
 .training-section {
   text-align: left;
   margin-bottom: 40px;
@@ -348,9 +364,8 @@ hr {
   transition: background-color 0.3s ease;
 }
 
-/* Styl dla zakończonego ćwiczenia */
 .exercise-item.exercise-done {
-  background-color: #d4edda; /* Ciemniejsza zieleń, sygnalizująca zakończenie */
+  background-color: #d4edda;
   border-color: #28a745;
 }
 
@@ -360,14 +375,14 @@ hr {
   align-items: center;
   margin-bottom: 10px;
   width: 100%;
-  gap: 10px; /* Odstęp między elementami nagłówka */
+  gap: 10px;
 }
 
 .exercise-name {
   font-weight: bold;
   color: #2c3e50;
   font-size: 1.1em;
-  flex-grow: 1; /* Pozwól nazwie zajmować dostępną przestrzeń */
+  flex-grow: 1;
   text-align: left;
 }
 
@@ -376,7 +391,7 @@ hr {
   height: 20px;
   cursor: pointer;
   accent-color: #42b983;
-  flex-shrink: 0; /* Nie zmniejszaj rozmiaru */
+  flex-shrink: 0;
 }
 
 .remove-button {
@@ -395,10 +410,9 @@ hr {
 }
 
 .exercise-content {
-  width: 100%; /* Upewnij się, że zawartość zajmuje całą szerokość */
+  width: 100%;
 }
 
-/* Style dla list serii */
 .set-list {
   list-style: none;
   padding: 0;
@@ -406,7 +420,7 @@ hr {
 }
 
 .set-item {
-  background-color: #f0f8ff; /* Jasnoniebieskie tło dla serii */
+  background-color: #f0f8ff;
   border: 1px solid #cce5ff;
   border-radius: 6px;
   padding: 10px;
@@ -414,13 +428,12 @@ hr {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px; /* Odstęp między elementami serii */
+  gap: 10px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
-/* Styl dla zakończonej serii */
 .set-item.set-done {
-  background-color: #d1ecf1; /* Jeszcze inny odcień, sygnalizujący zakończenie serii */
+  background-color: #d1ecf1;
   border-color: #007bff;
 }
 
@@ -429,7 +442,7 @@ hr {
   flex-direction: column;
   font-size: 0.8em;
   color: #555;
-  flex: 1 1 80px; /* Umożliwia rozciąganie, ale z minimalną szerokością */
+  flex: 1 1 80px;
 }
 
 .set-item input[type="number"] {
@@ -445,18 +458,18 @@ hr {
   width: 20px;
   height: 20px;
   cursor: pointer;
-  accent-color: #007bff; /* Kolor zaznaczonego checkboxa dla serii */
+  accent-color: #007bff;
 }
 
 .remove-set-button {
-  background-color: #ffc107; /* Żółty dla serii */
+  background-color: #ffc107;
   color: black;
   border: none;
   padding: 5px 10px;
   border-radius: 5px;
   cursor: pointer;
   font-size: 0.8em;
-  margin-left: auto; /* Wypchnij na prawo */
+  margin-left: auto;
 }
 
 .remove-set-button:hover {
@@ -464,7 +477,7 @@ hr {
 }
 
 .add-set-button {
-  background-color: #17a2b8; /* Turkusowy */
+  background-color: #17a2b8;
   color: white;
   border: none;
   padding: 8px 15px;
@@ -472,7 +485,7 @@ hr {
   cursor: pointer;
   font-size: 0.9em;
   margin-top: 15px;
-  width: 100%; /* Rozciągnij na całą szerokość */
+  width: 100%;
   transition: background-color 0.3s ease;
 }
 
@@ -519,7 +532,6 @@ hr {
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
-/* Sekcja Nawigacji */
 .navigation-section {
   text-align: center;
   background-color: #ffffff;

@@ -22,9 +22,7 @@
             :key="type.id"
             :value="type.id"
           >
-            {{ type.name }} ({{
-              type.category === "cardio" ? "Kardio" : "Siłowe"
-            }})
+            {{ type.name }} ({{ getCategoryName(type.category) }})
           </option>
         </select>
 
@@ -40,12 +38,48 @@
             class="param-image"
           />
 
-          <div v-if="selectedExerciseType.category === 'cardio'">
-            <label
-              >Długość (min):
+          <div v-if="selectedExerciseType.category === 'strength'"></div>
+
+          <div v-else-if="selectedExerciseType.category === 'cardio'">
+            <label>
+              Długość (min):
               <input
                 type="number"
                 v-model.number="cardioParams.duration"
+                placeholder="Długość w minutach"
+                required
+                min="1"
+              />
+            </label>
+          </div>
+
+          <div v-else-if="selectedExerciseType.category === 'flexibility'">
+            <label>
+              Powtórzenia:
+              <input
+                type="number"
+                v-model.number="flexibilityParams.reps"
+                placeholder="Liczba powtórzeń"
+                min="1"
+              />
+            </label>
+            <label>
+              Długość (min):
+              <input
+                type="number"
+                v-model.number="flexibilityParams.duration"
+                placeholder="Długość w minutach"
+                min="1"
+              />
+            </label>
+          </div>
+
+          <div v-else-if="selectedExerciseType.category === 'recovery'">
+            <label>
+              Długość (min):
+              <input
+                type="number"
+                v-model.number="recoveryParams.duration"
                 placeholder="Długość w minutach"
                 required
                 min="1"
@@ -76,8 +110,12 @@ export default defineComponent({
     const router = useRouter();
 
     const selectedExerciseTypeId = ref("");
-    // Usunięto strengthParams - serie dodajemy na WelcomeView
     const cardioParams = ref({ duration: null as number | null });
+    const flexibilityParams = ref({
+      reps: null as number | null,
+      duration: null as number | null,
+    });
+    const recoveryParams = ref({ duration: null as number | null });
     const addPlanError = ref<string | null>(null);
 
     const allExerciseTypes = computed<ExerciseType[]>(
@@ -90,7 +128,10 @@ export default defineComponent({
     );
 
     const onExerciseTypeChange = () => {
+      // Zresetuj parametry po zmianie typu ćwiczenia
       cardioParams.value = { duration: null };
+      flexibilityParams.value = { reps: null, duration: null };
+      recoveryParams.value = { duration: null };
       addPlanError.value = null;
     };
 
@@ -102,11 +143,11 @@ export default defineComponent({
       }
 
       let params: any = {};
-      if (selectedExerciseType.value.category === "strength") {
+      const category = selectedExerciseType.value.category;
+
+      if (category === "strength") {
         // Dla siłowych nie przekazujemy tu parametrów serii, bo będą puste na start
-        // Vuex sam zainicjuje pustą tablicę `sets`
-        // Można tu dodać alert, że serie dodajemy później, ale lepiej zostawić to UX
-      } else if (selectedExerciseType.value.category === "cardio") {
+      } else if (category === "cardio") {
         if (
           cardioParams.value.duration === null ||
           cardioParams.value.duration <= 0
@@ -116,6 +157,25 @@ export default defineComponent({
           return;
         }
         params = { ...cardioParams.value };
+      } else if (category === "flexibility") {
+        if (
+          flexibilityParams.value.reps === null &&
+          flexibilityParams.value.duration === null
+        ) {
+          addPlanError.value = "Podaj liczbę powtórzeń lub długość ćwiczenia.";
+          return;
+        }
+        params = { ...flexibilityParams.value };
+      } else if (category === "recovery") {
+        if (
+          recoveryParams.value.duration === null ||
+          recoveryParams.value.duration <= 0
+        ) {
+          addPlanError.value =
+            "Długość ćwiczenia regeneracyjnego musi być liczbą dodatnią.";
+          return;
+        }
+        params = { ...recoveryParams.value };
       }
 
       try {
@@ -136,22 +196,39 @@ export default defineComponent({
       router.back();
     };
 
+    const getCategoryName = (category: string) => {
+      switch (category) {
+        case "strength":
+          return "Siłowe";
+        case "cardio":
+          return "Cardio";
+        case "flexibility":
+          return "Mobilność i Elastyczność";
+        case "recovery":
+          return "Odnowa i Regeneracja";
+        default:
+          return category;
+      }
+    };
+
     return {
       selectedExerciseTypeId,
       cardioParams,
+      flexibilityParams,
+      recoveryParams,
       addPlanError,
       allExerciseTypes,
       selectedExerciseType,
       onExerciseTypeChange,
       addExerciseToPlan,
       goBack,
+      getCategoryName,
     };
   },
 });
 </script>
 
 <style scoped>
-/* Style bez zmian od poprzedniego razu, bo usunęliśmy tylko część template */
 .page-container {
   padding: 20px;
   text-align: center;

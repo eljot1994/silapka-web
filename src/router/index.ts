@@ -5,6 +5,7 @@ import AddExerciseView from "../views/AddExerciseView.vue"; // Nowy import
 import FinishTrainingView from "../views/FinishTrainingView.vue"; // Nowy import
 import HistoryView from "../views/HistoryView.vue"; // Nowy import
 import ExerciseTypesView from "../views/ExerciseTypesView.vue"; // Nowy import
+import StatsView from "../views/StatsView.vue"; // Dodaj ten import
 import store from "../store";
 
 const routes: Array<RouteRecordRaw> = [
@@ -80,6 +81,18 @@ const routes: Array<RouteRecordRaw> = [
       }
     },
   },
+  {
+    path: "/stats", // NOWA TRASA DLA STATYSTYK
+    name: "stats",
+    component: StatsView,
+    beforeEnter: (to, from, next) => {
+      if (store.getters.isAuthenticated) {
+        next();
+      } else {
+        next({ name: "home" });
+      }
+    },
+  },
 ];
 
 const router = createRouter({
@@ -88,7 +101,7 @@ const router = createRouter({
 });
 
 router.beforeEach(async (to, from, next) => {
-  if (!store.state.user && localStorage.getItem("currentUser")) {
+  if (!store.state.currentUser && localStorage.getItem("currentUser")) {
     await store.dispatch("initializeAuth");
   }
   next();
