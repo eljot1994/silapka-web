@@ -293,6 +293,8 @@ h1 {
 
 .chart-container {
   margin-bottom: 30px;
+  /* DODANA KLUCZOWA ZMIANA */
+  max-height: 400px;
 }
 
 .chart-container h3 {
