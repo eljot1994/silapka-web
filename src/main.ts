@@ -3,9 +3,22 @@ import App from "./App.vue";
 import "./registerServiceWorker";
 import router from "./router";
 import store from "./store";
+import { auth } from "./firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
-// Inicjalizuj Vuex store z danymi z localStorage
-store.dispatch("initializeAuth"); // Autentykacja jest inicjalizowana pierwsza
-store.dispatch("initializeData"); // Następnie pozostałe dane
+let app: any;
 
-createApp(App).use(store).use(router).mount("#app");
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    store.commit("SET_USER", { uid: user.uid, email: user.email });
+    store.dispatch("fetchUserData");
+  } else {
+    store.commit("SET_USER", null);
+  }
+
+  if (!app) {
+    app = createApp(App).use(store).use(router).mount("#app");
+  }
+
+  store.commit("SET_AUTH_IS_READY", true);
+});

@@ -1,8 +1,25 @@
 import { createStore } from "vuex";
 import router from "../router";
+import { auth, db } from "@/firebase";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+} from "firebase/auth";
+import {
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc,
+  arrayUnion,
+  arrayRemove,
+} from "firebase/firestore";
+import { v4 as uuidv4 } from "uuid";
 
 interface User {
+  uid: string;
   email: string;
+  name?: string;
 }
 
 export type ExerciseCategory =
@@ -45,6 +62,7 @@ export interface TrainingRecord {
 
 interface State {
   currentUser: User | null;
+  authIsReady: boolean;
   exerciseTypes: ExerciseType[];
   currentTraining: PlannedExercise[];
   trainingHistory: TrainingRecord[];
@@ -54,6 +72,7 @@ interface State {
 export default createStore<State>({
   state: {
     currentUser: null,
+    authIsReady: false,
     exerciseTypes: [],
     currentTraining: [],
     trainingHistory: [],
@@ -62,6 +81,7 @@ export default createStore<State>({
   getters: {
     isAuthenticated: (state) => !!state.currentUser,
     currentUser: (state) => state.currentUser,
+    authIsReady: (state) => state.authIsReady,
     allExerciseTypes: (state) => state.exerciseTypes,
     getExerciseTypeById: (state) => (id: string) =>
       state.exerciseTypes.find((type) => type.id === id),
@@ -70,315 +90,280 @@ export default createStore<State>({
     getUserStats: (state) => state.userStats,
   },
   mutations: {
-    setUser(state, user: User | null) {
+    SET_USER(state, user: User | null) {
       state.currentUser = user;
-      if (user) {
-        localStorage.setItem("currentUser", JSON.stringify(user));
-      } else {
-        localStorage.removeItem("currentUser");
-      }
     },
-    setExerciseTypes(state, types: ExerciseType[]) {
+    SET_AUTH_IS_READY(state, status: boolean) {
+      state.authIsReady = status;
+    },
+    SET_EXERCISE_TYPES(state, types: ExerciseType[]) {
       state.exerciseTypes = types;
-      localStorage.setItem("exerciseTypes", JSON.stringify(types));
     },
-    addExerciseType(state, type: ExerciseType) {
+    ADD_EXERCISE_TYPE(state, type: ExerciseType) {
       state.exerciseTypes.push(type);
-      localStorage.setItem(
-        "exerciseTypes",
-        JSON.stringify(state.exerciseTypes)
-      );
     },
-    setCurrentTraining(state, exercises: PlannedExercise[]) {
+    SET_CURRENT_TRAINING(state, exercises: PlannedExercise[]) {
       state.currentTraining = exercises;
-      localStorage.setItem("currentTraining", JSON.stringify(exercises));
     },
-    addExerciseToCurrentTraining(state, exercise: PlannedExercise) {
+    ADD_EXERCISE_TO_PLAN(state, exercise: PlannedExercise) {
       state.currentTraining.push(exercise);
-      localStorage.setItem(
-        "currentTraining",
-        JSON.stringify(state.currentTraining)
-      );
     },
-    removeExerciseFromCurrentTraining(state, exerciseId: string) {
-      state.currentTraining = state.currentTraining.filter(
-        (ex) => ex.id !== exerciseId
-      );
-      localStorage.setItem(
-        "currentTraining",
-        JSON.stringify(state.currentTraining)
-      );
-    },
-    updatePlannedExercise(state, updatedExercise: PlannedExercise) {
+    UPDATE_EXERCISE_IN_PLAN(state, updatedExercise: PlannedExercise) {
       const index = state.currentTraining.findIndex(
         (ex) => ex.id === updatedExercise.id
       );
       if (index !== -1) {
-        state.currentTraining.splice(index, 1, updatedExercise);
-        localStorage.setItem(
-          "currentTraining",
-          JSON.stringify(state.currentTraining)
-        );
+        state.currentTraining[index] = updatedExercise;
       }
     },
-    addSetToExercise(
+    REMOVE_EXERCISE_FROM_PLAN(state, exerciseId: string) {
+      state.currentTraining = state.currentTraining.filter(
+        (ex) => ex.id !== exerciseId
+      );
+    },
+    ADD_SET(
       state,
       { exerciseId, newSet }: { exerciseId: string; newSet: Set }
     ) {
       const exercise = state.currentTraining.find((ex) => ex.id === exerciseId);
-      if (exercise && exercise.category === "strength") {
-        if (!exercise.sets) {
-          exercise.sets = [];
-        }
+      if (exercise && exercise.sets) {
         exercise.sets.push(newSet);
-        localStorage.setItem(
-          "currentTraining",
-          JSON.stringify(state.currentTraining)
-        );
       }
     },
-    updateSetInExercise(
+    UPDATE_SET(
       state,
       { exerciseId, updatedSet }: { exerciseId: string; updatedSet: Set }
     ) {
       const exercise = state.currentTraining.find((ex) => ex.id === exerciseId);
-      if (exercise && exercise.category === "strength" && exercise.sets) {
-        const setIndex = exercise.sets.findIndex((s) => s.id === updatedSet.id);
+      if (exercise && exercise.sets) {
+        const setIndex = exercise.sets.findIndex(
+          (set) => set.id === updatedSet.id
+        );
         if (setIndex !== -1) {
-          exercise.sets.splice(setIndex, 1, updatedSet);
-          localStorage.setItem(
-            "currentTraining",
-            JSON.stringify(state.currentTraining)
-          );
+          exercise.sets[setIndex] = updatedSet;
         }
       }
     },
-    removeSetFromExercise(
+    REMOVE_SET(
       state,
       { exerciseId, setId }: { exerciseId: string; setId: string }
     ) {
       const exercise = state.currentTraining.find((ex) => ex.id === exerciseId);
-      if (exercise && exercise.category === "strength" && exercise.sets) {
-        exercise.sets = exercise.sets.filter((s) => s.id !== setId);
-        localStorage.setItem(
-          "currentTraining",
-          JSON.stringify(state.currentTraining)
-        );
+      if (exercise && exercise.sets) {
+        exercise.sets = exercise.sets.filter((set) => set.id !== setId);
       }
     },
-    addTrainingToHistory(state, training: TrainingRecord) {
-      state.trainingHistory.push(training);
-      localStorage.setItem(
-        "trainingHistory",
-        JSON.stringify(state.trainingHistory)
-      );
-      state.currentTraining = [];
-      localStorage.removeItem("currentTraining");
-    },
-    setTrainingHistory(state, history: TrainingRecord[]) {
+    SET_TRAINING_HISTORY(state, history: TrainingRecord[]) {
       state.trainingHistory = history;
-      localStorage.setItem("trainingHistory", JSON.stringify(history));
     },
-    setUserStats(state, stats: any) {
-      state.userStats = stats;
-      localStorage.setItem("userStats", JSON.stringify(stats));
+    ADD_TRAINING_TO_HISTORY(state, training: TrainingRecord) {
+      state.trainingHistory.push(training);
+    },
+    CLEAR_CURRENT_TRAINING(state) {
+      state.currentTraining = [];
     },
   },
   actions: {
-    initializeAuth({ commit }) {
-      const storedUser = localStorage.getItem("currentUser");
-      if (storedUser) {
-        try {
-          commit("setUser", JSON.parse(storedUser));
-        } catch (e) {
-          console.error(
-            "Błąd podczas ładowania użytkownika z localStorage:",
-            e
-          );
-          commit("setUser", null);
-        }
-      }
-    },
-    async register({ commit }, { email, password }: any) {
-      const existingUsers = JSON.parse(
-        localStorage.getItem("registeredUsers") || "[]"
-      );
-      if (existingUsers.some((u: any) => u.email === email)) {
-        throw new Error("Użytkownik o podanym adresie email już istnieje.");
-      }
-      if (password.length < 6) {
-        throw new Error("Hasło musi mieć co najmniej 6 znaków.");
-      }
-      const newUser = { email, password };
-      existingUsers.push(newUser);
-      localStorage.setItem("registeredUsers", JSON.stringify(existingUsers));
-    },
-    async login({ commit }, { email, password }: any) {
-      const registeredUsers = JSON.parse(
-        localStorage.getItem("registeredUsers") || "[]"
-      );
-      const userFound = registeredUsers.find(
-        (u: any) => u.email === email && u.password === password
-      );
-
-      if (userFound) {
-        const user: User = { email: userFound.email };
-        commit("setUser", user);
-        router.push({ name: "welcome" });
+    async signup({ commit }, { email, password }) {
+      const res = await createUserWithEmailAndPassword(auth, email, password);
+      if (res.user) {
+        const userRef = doc(db, "users", res.user.uid);
+        await setDoc(userRef, {
+          email: res.user.email,
+          exerciseTypes: [],
+          currentTraining: [],
+          trainingHistory: [],
+        });
+        commit("SET_USER", { uid: res.user.uid, email: res.user.email });
       } else {
-        throw new Error("Nieprawidłowy email lub hasło.");
+        throw new Error("Could not complete signup");
+      }
+    },
+    async login({ commit }, { email, password }) {
+      const res = await signInWithEmailAndPassword(auth, email, password);
+      if (res.user) {
+        commit("SET_USER", { uid: res.user.uid, email: res.user.email });
+      } else {
+        throw new Error("Could not complete login");
       }
     },
     async logout({ commit }) {
-      commit("setUser", null);
-      router.push({ name: "home" });
+      await signOut(auth);
+      commit("SET_USER", null);
+      commit("SET_EXERCISE_TYPES", []);
+      commit("SET_CURRENT_TRAINING", []);
+      commit("SET_TRAINING_HISTORY", []);
     },
-    initializeData({ commit }) {
-      const storedExerciseTypes = localStorage.getItem("exerciseTypes");
-      if (storedExerciseTypes) {
-        try {
-          commit("setExerciseTypes", JSON.parse(storedExerciseTypes));
-        } catch (e) {
-          console.error("Błąd ładowania typów ćwiczeń:", e);
-        }
-      }
-      const storedCurrentTraining = localStorage.getItem("currentTraining");
-      if (storedCurrentTraining) {
-        try {
-          commit("setCurrentTraining", JSON.parse(storedCurrentTraining));
-        } catch (e) {
-          console.error("Błąd ładowania bieżącego treningu:", e);
-        }
-      }
-      const storedTrainingHistory = localStorage.getItem("trainingHistory");
-      if (storedTrainingHistory) {
-        try {
-          commit("setTrainingHistory", JSON.parse(storedTrainingHistory));
-        } catch (e) {
-          console.error("Błąd ładowania historii treningów:", e);
-        }
-      }
-      const storedUserStats = localStorage.getItem("userStats");
-      if (storedUserStats) {
-        try {
-          commit("setUserStats", JSON.parse(storedUserStats));
-        } catch (e) {
-          console.error("Błąd ładowania statystyk użytkownika:", e);
+    async fetchUserData({ commit, state }) {
+      if (state.currentUser) {
+        const userRef = doc(db, "users", state.currentUser.uid);
+        const docSnap = await getDoc(userRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          commit("SET_EXERCISE_TYPES", data.exerciseTypes || []);
+          commit("SET_CURRENT_TRAINING", data.currentTraining || []);
+          commit("SET_TRAINING_HISTORY", data.trainingHistory || []);
         }
       }
     },
-    addExerciseType({ commit }, type: Omit<ExerciseType, "id">) {
-      const newType: ExerciseType = { ...type, id: Date.now().toString() };
-      commit("addExerciseType", newType);
+    async addExerciseType({ commit, state }, type: Omit<ExerciseType, "id">) {
+      if (state.currentUser) {
+        const newType: ExerciseType = { ...type, id: uuidv4() };
+        const userRef = doc(db, "users", state.currentUser.uid);
+        await updateDoc(userRef, {
+          exerciseTypes: arrayUnion(newType),
+        });
+        commit("ADD_EXERCISE_TYPE", newType);
+      }
     },
-    addExerciseToPlan(
-      { commit, getters },
+    async addExerciseToPlan(
+      { commit, state, getters },
       { exerciseTypeId, params }: { exerciseTypeId: string; params: any }
     ) {
-      const exerciseType = getters.getExerciseTypeById(exerciseTypeId);
-      if (!exerciseType) {
-        throw new Error("Wybrany typ ćwiczenia nie istnieje.");
-      }
-      const newPlannedExercise: PlannedExercise = {
-        id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
-        exerciseTypeId: exerciseType.id,
-        name: exerciseType.name,
-        category: exerciseType.category,
-        done: false,
-        ...params,
-      };
-
-      if (newPlannedExercise.category === "strength") {
-        newPlannedExercise.sets = [];
-      }
-      commit("addExerciseToCurrentTraining", newPlannedExercise);
-    },
-    removeExerciseFromPlan({ commit }, exerciseId: string) {
-      commit("removeExerciseFromCurrentTraining", exerciseId);
-    },
-    updateExerciseInPlan({ commit }, updatedExercise: PlannedExercise) {
-      commit("updatePlannedExercise", updatedExercise);
-    },
-    addSet(
-      { commit },
-      {
-        exerciseId,
-        weight,
-        reps,
-      }: { exerciseId: string; weight: number | null; reps: number | null }
-    ) {
-      const newSet: Set = {
-        id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
-        weight,
-        reps,
-        done: false,
-      };
-      commit("addSetToExercise", { exerciseId, newSet });
-    },
-    updateSet(
-      { commit },
-      { exerciseId, updatedSet }: { exerciseId: string; updatedSet: Set }
-    ) {
-      commit("updateSetInExercise", { exerciseId, updatedSet });
-    },
-    removeSet(
-      { commit },
-      { exerciseId, setId }: { exerciseId: string; setId: string }
-    ) {
-      commit("removeSetFromExercise", { exerciseId, setId });
-    },
-    finishCurrentTraining({ commit, state }) {
-      const currentTrainingExercises = state.currentTraining;
-      const hasAnyExerciseDone = currentTrainingExercises.some((ex) => {
-        if (ex.category === "strength" && ex.sets) {
-          return ex.sets.some((s) => s.done);
-        } else {
-          return ex.done;
+      if (state.currentUser) {
+        const exerciseType = getters.getExerciseTypeById(exerciseTypeId);
+        if (!exerciseType) {
+          throw new Error("Exercise type not found.");
         }
-      });
 
-      if (!hasAnyExerciseDone) {
-        throw new Error(
-          "Musisz wykonać co najmniej jedno ćwiczenie, aby zakończyć trening."
+        const newExercise: PlannedExercise = {
+          id: uuidv4(),
+          exerciseTypeId: exerciseType.id,
+          name: exerciseType.name,
+          category: exerciseType.category,
+          done: false,
+          ...params,
+        };
+
+        if (newExercise.category === "strength") {
+          newExercise.sets = [
+            { id: uuidv4(), weight: null, reps: null, done: false },
+          ];
+        }
+
+        const userRef = doc(db, "users", state.currentUser.uid);
+        await updateDoc(userRef, {
+          currentTraining: arrayUnion(newExercise),
+        });
+        commit("ADD_EXERCISE_TO_PLAN", newExercise);
+      }
+    },
+    async updateExerciseInPlan(
+      { commit, state },
+      updatedExercise: PlannedExercise
+    ) {
+      if (state.currentUser) {
+        const userRef = doc(db, "users", state.currentUser.uid);
+        const currentTraining = [...state.currentTraining];
+        const index = currentTraining.findIndex(
+          (ex) => ex.id === updatedExercise.id
         );
-      }
-
-      const newTrainingRecord: TrainingRecord = {
-        id: Date.now().toString(),
-        date: new Date().toISOString().split("T")[0],
-        exercises: JSON.parse(JSON.stringify(currentTrainingExercises)),
-      };
-      commit("addTrainingToHistory", newTrainingRecord);
-
-      const currentStats = state.userStats;
-      currentStats.totalTrainings = (currentStats.totalTrainings || 0) + 1;
-      let completedSetsCount = 0;
-      let completedCardioCount = 0;
-      let completedFlexibilityCount = 0;
-      let completedRecoveryCount = 0; // NOWA STATYSTYKA
-      currentTrainingExercises.forEach((ex) => {
-        if (ex.category === "strength" && ex.sets) {
-          completedSetsCount += ex.sets.filter((s) => s.done).length;
-        } else if (ex.category === "cardio" && ex.done) {
-          completedCardioCount++;
-        } else if (ex.category === "flexibility" && ex.done) {
-          completedFlexibilityCount++;
-        } else if (ex.category === "recovery" && ex.done) {
-          completedRecoveryCount++;
+        if (index !== -1) {
+          currentTraining[index] = updatedExercise;
+          await updateDoc(userRef, {
+            currentTraining: currentTraining,
+          });
+          commit("UPDATE_EXERCISE_IN_PLAN", updatedExercise);
         }
-      });
-      currentStats.totalCompletedSets =
-        (currentStats.totalCompletedSets || 0) + completedSetsCount;
-      currentStats.totalCompletedCardio =
-        (currentStats.totalCompletedCardio || 0) + completedCardioCount;
-      currentStats.totalCompletedFlexibility =
-        (currentStats.totalCompletedFlexibility || 0) +
-        completedFlexibilityCount;
-      currentStats.totalCompletedRecovery =
-        (currentStats.totalCompletedRecovery || 0) + completedRecoveryCount;
+      }
+    },
+    async removeExerciseFromPlan({ commit, state }, exerciseId: string) {
+      if (state.currentUser) {
+        const exerciseToRemove = state.currentTraining.find(
+          (ex) => ex.id === exerciseId
+        );
+        if (exerciseToRemove) {
+          const userRef = doc(db, "users", state.currentUser.uid);
+          await updateDoc(userRef, {
+            currentTraining: arrayRemove(exerciseToRemove),
+          });
+          commit("REMOVE_EXERCISE_FROM_PLAN", exerciseId);
+        }
+      }
+    },
+    async addSet({ commit, state }, { exerciseId, weight, reps }) {
+      if (state.currentUser) {
+        const exercise = state.currentTraining.find(
+          (ex) => ex.id === exerciseId
+        );
+        if (exercise && exercise.sets) {
+          const newSet = { id: uuidv4(), weight, reps, done: false };
+          const updatedExercise = {
+            ...exercise,
+            sets: [...exercise.sets, newSet],
+          };
+          const userRef = doc(db, "users", state.currentUser.uid);
+          await updateDoc(userRef, {
+            currentTraining: state.currentTraining.map((ex) =>
+              ex.id === exerciseId ? updatedExercise : ex
+            ),
+          });
+          commit("ADD_SET", { exerciseId, newSet });
+        }
+      }
+    },
+    async updateSet({ commit, state }, { exerciseId, updatedSet }) {
+      if (state.currentUser) {
+        const exercise = state.currentTraining.find(
+          (ex) => ex.id === exerciseId
+        );
+        if (exercise && exercise.sets) {
+          const updatedSets = exercise.sets.map((set) =>
+            set.id === updatedSet.id ? updatedSet : set
+          );
+          const updatedExercise = { ...exercise, sets: updatedSets };
+          const userRef = doc(db, "users", state.currentUser.uid);
+          await updateDoc(userRef, {
+            currentTraining: state.currentTraining.map((ex) =>
+              ex.id === exerciseId ? updatedExercise : ex
+            ),
+          });
+          commit("UPDATE_SET", { exerciseId, updatedSet });
+        }
+      }
+    },
+    async removeSet({ commit, state }, { exerciseId, setId }) {
+      if (state.currentUser) {
+        const exercise = state.currentTraining.find(
+          (ex) => ex.id === exerciseId
+        );
+        if (exercise && exercise.sets) {
+          const updatedSets = exercise.sets.filter((set) => set.id !== setId);
+          const updatedExercise = { ...exercise, sets: updatedSets };
+          const userRef = doc(db, "users", state.currentUser.uid);
+          await updateDoc(userRef, {
+            currentTraining: state.currentTraining.map((ex) =>
+              ex.id === exerciseId ? updatedExercise : ex
+            ),
+          });
+          commit("REMOVE_SET", { exerciseId, setId });
+        }
+      }
+    },
+    async finishCurrentTraining({ commit, state }) {
+      if (state.currentUser) {
+        const hasAnyExerciseDone = state.currentTraining.some((ex) => ex.done);
+        if (!hasAnyExerciseDone) {
+          throw new Error(
+            "Nie możesz zakończyć treningu bez wykonania żadnego ćwiczenia."
+          );
+        }
 
-      commit("setUserStats", currentStats);
+        const completedTraining: TrainingRecord = {
+          id: uuidv4(),
+          date: new Date().toLocaleDateString("pl-PL"),
+          exercises: state.currentTraining,
+        };
+
+        const userRef = doc(db, "users", state.currentUser.uid);
+        await updateDoc(userRef, {
+          trainingHistory: arrayUnion(completedTraining),
+          currentTraining: [],
+        });
+
+        commit("ADD_TRAINING_TO_HISTORY", completedTraining);
+        commit("CLEAR_CURRENT_TRAINING");
+      }
     },
   },
-  modules: {},
 });

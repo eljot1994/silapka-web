@@ -1,7 +1,7 @@
 <template>
   <div class="home-container">
     <header class="app-header">
-      <h1>Silapka</h1>
+      <h1>Siłapka</h1>
     </header>
 
     <div class="auth-section">
@@ -104,8 +104,10 @@ export default defineComponent({
           email: loginEmail.value,
           password: loginPassword.value,
         });
+        // PRZEKIEROWANIE Z KOMPONENTU PO UDANYM LOGOWANIU
+        router.push({ name: "welcome" });
       } catch (error: any) {
-        loginError.value = error.message || "Wystąpił nieznany błąd logowania.";
+        loginError.value = error.message || "Wystąpił błąd logowania.";
       }
     };
 
@@ -116,7 +118,7 @@ export default defineComponent({
         return;
       }
       try {
-        await store.dispatch("register", {
+        await store.dispatch("signup", {
           email: registerEmail.value,
           password: registerPassword.value,
         });
@@ -125,8 +127,16 @@ export default defineComponent({
         registerPassword.value = "";
         registerPasswordConfirm.value = "";
       } catch (error: any) {
-        registerError.value =
-          error.message || "Wystąpił nieznany błąd rejestracji.";
+        // Poprawiony komunikat błędu
+        if (error.code === "auth/email-already-in-use") {
+          registerError.value = "Podany adres e-mail jest już używany.";
+        } else if (error.code === "auth/weak-password") {
+          registerError.value =
+            "Hasło jest zbyt słabe. Użyj co najmniej 6 znaków.";
+        } else {
+          registerError.value =
+            error.message || "Wystąpił nieznany błąd rejestracji.";
+        }
       }
     };
 
