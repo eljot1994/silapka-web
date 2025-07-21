@@ -6,26 +6,44 @@
     <hr />
 
     <div class="training-section">
-      <h3>Najbliższy trening</h3>
+      <h3>
+        Najbliższy trening
+        <span v-if="isTrainingActive" class="timer">{{ trainingTime }}</span>
+      </h3>
+
+      <div
+        v-if="!isTrainingActive && currentTraining.length > 0"
+        class="training-actions"
+      >
+        <button @click="startTraining" class="action-button primary">
+          Rozpocznij Trening
+        </button>
+      </div>
+
       <p v-if="currentTraining.length === 0" class="no-exercises">
-        Brak zaplanowanych ćwiczeń na ten trening.
+        Brak zaplanowanych ćwiczeń na ten trening. Dodaj nowe, aby zacząć!
       </p>
       <ul v-else class="exercise-list">
         <li
           v-for="exercise in currentTraining"
           :key="exercise.id"
           class="exercise-item"
-          :class="{ 'exercise-done': exercise.done }"
+          :class="{
+            'exercise-done': exercise.done,
+            'active-training': isTrainingActive,
+          }"
         >
           <div class="exercise-header">
             <span class="exercise-name">{{ exercise.name }}</span>
             <input
               type="checkbox"
+              title="Oznacz jako wykonane (tylko podczas treningu)"
               :checked="exercise.done"
+              :disabled="!isTrainingActive"
               @change="toggleExerciseDone(exercise.id)"
             />
             <button @click="removeExercise(exercise.id)" class="remove-button">
-              Usuń ćwiczenie
+              Usuń
             </button>
           </div>
 
@@ -39,30 +57,34 @@
                   class="set-item"
                   :class="{ 'set-done': set.done }"
                 >
-                  <label
-                    >Waga (kg):
+                  <label>
+                    Waga (kg):
                     <input
                       type="number"
                       v-model.number="set.weight"
                       @input="updateSetInStore(exercise.id, set)"
-                  /></label>
-                  <label
-                    >Powt.:
+                    />
+                  </label>
+                  <label>
+                    Powt.:
                     <input
                       type="number"
                       v-model.number="set.reps"
                       @input="updateSetInStore(exercise.id, set)"
-                  /></label>
+                    />
+                  </label>
                   <input
                     type="checkbox"
+                    title="Oznacz jako wykonane (tylko podczas treningu)"
                     :checked="set.done"
+                    :disabled="!isTrainingActive"
                     @change="toggleSetDone(exercise.id, set.id)"
                   />
                   <button
                     @click="removeSet(exercise.id, set.id)"
                     class="remove-set-button"
                   >
-                    Usuń serię
+                    Usuń
                   </button>
                 </li>
               </ul>
@@ -72,40 +94,44 @@
             </template>
 
             <template v-else-if="exercise.category === 'cardio'">
-              <label
-                >Długość (min):
+              <label>
+                Długość (min):
                 <input
                   type="number"
                   v-model.number="exercise.duration"
                   @input="updateExerciseInStore(exercise)"
-              /></label>
+                />
+              </label>
             </template>
 
             <template v-else-if="exercise.category === 'flexibility'">
-              <label v-if="exercise.reps"
-                >Powtórzenia:
+              <label v-if="exercise.reps !== undefined">
+                Powtórzenia:
                 <input
                   type="number"
                   v-model.number="exercise.reps"
                   @input="updateExerciseInStore(exercise)"
-              /></label>
-              <label v-if="exercise.duration"
-                >Długość (min):
+                />
+              </label>
+              <label v-if="exercise.duration !== undefined">
+                Długość (min):
                 <input
                   type="number"
                   v-model.number="exercise.duration"
                   @input="updateExerciseInStore(exercise)"
-              /></label>
+                />
+              </label>
             </template>
 
             <template v-else-if="exercise.category === 'recovery'">
-              <label
-                >Długość (min):
+              <label>
+                Długość (min):
                 <input
                   type="number"
                   v-model.number="exercise.duration"
                   @input="updateExerciseInStore(exercise)"
-              /></label>
+                />
+              </label>
             </template>
           </div>
         </li>
@@ -115,7 +141,21 @@
         <button @click="goToAddExercise" class="action-button primary">
           Dodaj ćwiczenie
         </button>
-        <button @click="finishTraining" class="action-button secondary">
+        <button
+          @click="saveAsTemplate"
+          v-if="currentTraining.length > 0"
+          class="action-button"
+        >
+          Zapisz jako szablon
+        </button>
+        <button @click="goToTemplates" class="action-button">
+          Wczytaj szablon
+        </button>
+        <button
+          @click="finishTraining"
+          v-if="isTrainingActive"
+          class="action-button secondary"
+        >
           Zakończ trening
         </button>
       </div>
@@ -129,6 +169,9 @@
     <div class="navigation-section">
       <h3>Nawigacja</h3>
       <div class="nav-buttons">
+        <button @click="goToTemplates" class="nav-button">
+          Szablony Treningów
+        </button>
         <button @click="goToHistory" class="nav-button">Historia</button>
         <button @click="goToExerciseTypes" class="nav-button">
           Typy ćwiczeń
@@ -140,7 +183,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, ref } from "vue";
+import { defineComponent, computed, ref, onUnmounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { PlannedExercise, Set } from "@/store";
@@ -159,11 +202,42 @@ export default defineComponent({
     );
     const finishTrainingError = ref<string | null>(null);
 
-    const handleLogout = () => {
-      store.dispatch("logout");
+    const isTrainingActive = computed(() => store.getters.isTrainingActive);
+    const trainingTime = ref("00:00:00");
+    let timerInterval: number | undefined;
+
+    const startTraining = () => {
+      store.commit("SET_TRAINING_ACTIVE", true);
+      timerInterval = window.setInterval(() => {
+        const startTime = store.state.trainingStartTime;
+        if (startTime) {
+          const diff = Math.floor((Date.now() - startTime) / 1000);
+          const h = Math.floor(diff / 3600)
+            .toString()
+            .padStart(2, "0");
+          const m = Math.floor((diff % 3600) / 60)
+            .toString()
+            .padStart(2, "0");
+          const s = (diff % 60).toString().padStart(2, "0");
+          trainingTime.value = `${h}:${m}:${s}`;
+        }
+      }, 1000);
     };
 
+    onUnmounted(() => {
+      if (timerInterval) {
+        clearInterval(timerInterval);
+      }
+    });
+
+    const handleLogout = () => {
+      store.dispatch("logout");
+      router.push({ name: "home" });
+    };
+
+    // --- Metody do oznaczania jako wykonane ---
     const toggleExerciseDone = (exerciseId: string) => {
+      if (!isTrainingActive.value) return; // Zabezpieczenie
       const exercise = currentTraining.value.find((ex) => ex.id === exerciseId);
       if (exercise) {
         if (
@@ -188,6 +262,7 @@ export default defineComponent({
     };
 
     const toggleSetDone = (exerciseId: string, setId: string) => {
+      if (!isTrainingActive.value) return; // Zabezpieczenie
       const exercise = currentTraining.value.find((ex) => ex.id === exerciseId);
       if (exercise && exercise.category === "strength" && exercise.sets) {
         const set = exercise.sets.find((s) => s.id === setId);
@@ -206,6 +281,7 @@ export default defineComponent({
       }
     };
 
+    // --- Metody do edycji planu (działają zawsze) ---
     const addSet = (exerciseId: string) => {
       store.dispatch("addSet", { exerciseId, weight: null, reps: null });
     };
@@ -230,6 +306,7 @@ export default defineComponent({
       }
     };
 
+    // --- Metody nawigacji i finalizacji ---
     const finishTraining = async () => {
       finishTrainingError.value = null;
       try {
@@ -258,10 +335,25 @@ export default defineComponent({
       router.push({ name: "stats" });
     };
 
+    const saveAsTemplate = () => {
+      const name = prompt("Podaj nazwę dla szablonu:");
+      if (name && name.trim() !== "") {
+        store.dispatch("saveCurrentTrainingAsTemplate", name);
+        alert(`Trening zapisany jako szablon "${name}"`);
+      }
+    };
+
+    const goToTemplates = () => {
+      router.push({ name: "templates" });
+    };
+
     return {
       userEmail,
       currentTraining,
       finishTrainingError,
+      isTrainingActive,
+      trainingTime,
+      startTraining,
       handleLogout,
       toggleExerciseDone,
       toggleSetDone,
@@ -275,12 +367,23 @@ export default defineComponent({
       goToHistory,
       goToExerciseTypes,
       goToStats,
+      saveAsTemplate,
+      goToTemplates,
     };
   },
 });
 </script>
 
 <style scoped>
+.timer {
+  font-size: 0.8em;
+  font-weight: bold;
+  color: #007bff;
+  margin-left: 15px;
+  background-color: #e3f2fd;
+  padding: 5px 10px;
+  border-radius: 5px;
+}
 .welcome-container {
   padding: 20px;
   text-align: center;
@@ -291,7 +394,6 @@ export default defineComponent({
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   position: relative;
 }
-
 .logout-button {
   position: absolute;
   top: 20px;
@@ -305,24 +407,20 @@ export default defineComponent({
   font-size: 0.9em;
   transition: background-color 0.3s ease;
 }
-
 .logout-button:hover {
   background-color: #c82333;
 }
-
 h2 {
   color: #2c3e50;
   margin-bottom: 30px;
   padding-top: 20px;
   font-size: 2em;
 }
-
 hr {
   border: none;
   border-top: 1px solid #eee;
   margin: 40px 0;
 }
-
 .training-section {
   text-align: left;
   margin-bottom: 40px;
@@ -331,27 +429,23 @@ hr {
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
-
 .training-section h3 {
   font-size: 1.8em;
   color: #42b983;
   margin-bottom: 20px;
   text-align: center;
 }
-
 .no-exercises {
   text-align: center;
   color: #777;
   font-style: italic;
   margin-bottom: 20px;
 }
-
 .exercise-list {
   list-style: none;
   padding: 0;
   margin-bottom: 30px;
 }
-
 .exercise-item {
   background-color: #e8f5e9;
   border: 1px solid #c8e6c9;
@@ -361,14 +455,12 @@ hr {
   display: flex;
   flex-direction: column;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-  transition: background-color 0.3s ease;
+  transition: background-color 0.3s ease, opacity 0.3s ease;
 }
-
-.exercise-item.exercise-done {
+.exercise-item.active-training.exercise-done {
   background-color: #d4edda;
   border-color: #28a745;
 }
-
 .exercise-header {
   display: flex;
   justify-content: space-between;
@@ -377,7 +469,6 @@ hr {
   width: 100%;
   gap: 10px;
 }
-
 .exercise-name {
   font-weight: bold;
   color: #2c3e50;
@@ -385,7 +476,6 @@ hr {
   flex-grow: 1;
   text-align: left;
 }
-
 .exercise-item input[type="checkbox"] {
   width: 20px;
   height: 20px;
@@ -393,7 +483,9 @@ hr {
   accent-color: #42b983;
   flex-shrink: 0;
 }
-
+.exercise-item input:disabled {
+  cursor: not-allowed;
+}
 .remove-button {
   background-color: #dc3545;
   color: white;
@@ -404,21 +496,17 @@ hr {
   font-size: 0.8em;
   flex-shrink: 0;
 }
-
 .remove-button:hover {
   background-color: #c82333;
 }
-
 .exercise-content {
   width: 100%;
 }
-
 .set-list {
   list-style: none;
   padding: 0;
   margin-top: 10px;
 }
-
 .set-item {
   background-color: #f0f8ff;
   border: 1px solid #cce5ff;
@@ -431,12 +519,10 @@ hr {
   gap: 10px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
 }
-
 .set-item.set-done {
   background-color: #d1ecf1;
   border-color: #007bff;
 }
-
 .set-item label {
   display: flex;
   flex-direction: column;
@@ -444,7 +530,6 @@ hr {
   color: #555;
   flex: 1 1 80px;
 }
-
 .set-item input[type="number"] {
   width: 100%;
   padding: 5px 8px;
@@ -453,14 +538,12 @@ hr {
   margin-top: 3px;
   font-size: 0.9em;
 }
-
 .set-item input[type="checkbox"] {
   width: 20px;
   height: 20px;
   cursor: pointer;
   accent-color: #007bff;
 }
-
 .remove-set-button {
   background-color: #ffc107;
   color: black;
@@ -471,11 +554,9 @@ hr {
   font-size: 0.8em;
   margin-left: auto;
 }
-
 .remove-set-button:hover {
   background-color: #e0a800;
 }
-
 .add-set-button {
   background-color: #17a2b8;
   color: white;
@@ -488,18 +569,20 @@ hr {
   width: 100%;
   transition: background-color 0.3s ease;
 }
-
-.add-set-button:hover {
+.add-set-button:hover:not(:disabled) {
   background-color: #138496;
 }
-
+.add-set-button:disabled {
+  background-color: #a0a0a0;
+  cursor: not-allowed;
+}
 .training-actions {
+  margin-top: 20px;
   display: flex;
   justify-content: center;
   gap: 15px;
   flex-wrap: wrap;
 }
-
 .action-button {
   flex: 1 1 45%;
   max-width: 250px;
@@ -511,27 +594,26 @@ hr {
   transition: background-color 0.3s ease, box-shadow 0.3s ease;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
-
+.action-button:disabled {
+  background-color: #a0a0a0;
+  cursor: not-allowed;
+}
 .action-button.primary {
   background-color: #42b983;
   color: white;
 }
-
-.action-button.primary:hover {
+.action-button.primary:hover:not(:disabled) {
   background-color: #368a65;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
-
 .action-button.secondary {
   background-color: #007bff;
   color: white;
 }
-
 .action-button.secondary:hover {
   background-color: #0056b3;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
-
 .navigation-section {
   text-align: center;
   background-color: #ffffff;
@@ -539,13 +621,11 @@ hr {
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
-
 .navigation-section h3 {
   font-size: 1.8em;
   color: #2c3e50;
   margin-bottom: 20px;
 }
-
 .nav-buttons {
   display: flex;
   flex-direction: column;
@@ -553,7 +633,6 @@ hr {
   max-width: 300px;
   margin: 0 auto;
 }
-
 .nav-button {
   background-color: #6c757d;
   color: white;
@@ -565,12 +644,10 @@ hr {
   transition: background-color 0.3s ease, box-shadow 0.3s ease;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
-
 .nav-button:hover {
   background-color: #5a6268;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
-
 .error-message {
   color: #dc3545;
   margin-top: 10px;

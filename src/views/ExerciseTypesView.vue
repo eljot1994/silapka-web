@@ -4,15 +4,17 @@
     <button @click="goBack" class="back-button">Wróć</button>
 
     <div class="exercise-types-section">
-      <h3>Dodaj nowy typ ćwiczenia</h3>
+      <h3>
+        {{ isEditing ? "Edytuj typ ćwiczenia" : "Dodaj nowy typ ćwiczenia" }}
+      </h3>
       <form @submit.prevent="handleFormSubmit" class="add-form">
         <div class="form-group">
           <label for="name">Nazwa:</label>
-          <input type="text" id="name" v-model="newExercise.name" required />
+          <input type="text" id="name" v-model="exerciseForm.name" required />
         </div>
         <div class="form-group">
           <label for="category">Kategoria:</label>
-          <select id="category" v-model="newExercise.category" required>
+          <select id="category" v-model="exerciseForm.category" required>
             <option value="" disabled>Wybierz kategorię</option>
             <option value="strength">Siłowe</option>
             <option value="cardio">Cardio</option>
@@ -24,15 +26,24 @@
           <label for="description">Opis:</label>
           <textarea
             id="description"
-            v-model="newExercise.description"
-            required
+            v-model="exerciseForm.description"
           ></textarea>
         </div>
         <div class="form-group">
           <label for="imageUrl">URL zdjęcia (opcjonalnie):</label>
-          <input type="text" id="imageUrl" v-model="newExercise.imageUrl" />
+          <input type="text" id="imageUrl" v-model="exerciseForm.imageUrl" />
         </div>
-        <button type="submit" class="submit-button">Dodaj typ</button>
+        <button type="submit" class="submit-button">
+          {{ isEditing ? "Zapisz zmiany" : "Dodaj typ" }}
+        </button>
+        <button
+          v-if="isEditing"
+          @click="cancelEdit"
+          type="button"
+          class="cancel-button"
+        >
+          Anuluj
+        </button>
       </form>
 
       <h3>Dostępne typy ćwiczeń</h3>
@@ -54,45 +65,16 @@
               <span class="exercise-category"
                 >({{ getCategoryName(type.category) }})</span
               >
-              <p class="exercise-description">{{ type.description }}</p>
-
-              <div class="exercise-stats">
-                <p><strong>Statystyki:</strong></p>
-                <ul>
-                  <li>
-                    Użyto w treningu: {{ getStats(type.id).usageCount }} razy
-                  </li>
-                  <li v-if="getStats(type.id).category === 'strength'">
-                    Najwyższy ciężar:
-                    {{ getStats(type.id).maxWeight || "-" }} kg
-                  </li>
-                  <li v-if="getStats(type.id).category === 'strength'">
-                    Średnia waga: {{ getStats(type.id).avgWeight || "-" }} kg
-                  </li>
-                  <li
-                    v-if="
-                      getStats(type.id).category === 'strength' ||
-                      getStats(type.id).category === 'flexibility'
-                    "
-                  >
-                    Średnia powtórzeń: {{ getStats(type.id).avgReps || "-" }}
-                  </li>
-                  <li v-if="getStats(type.id).category === 'strength'">
-                    Łącznie serii: {{ getStats(type.id).totalSets || "-" }}
-                  </li>
-                  <li
-                    v-if="
-                      getStats(type.id).category === 'cardio' ||
-                      getStats(type.id).category === 'flexibility' ||
-                      getStats(type.id).category === 'recovery'
-                    "
-                  >
-                    Łączny czas:
-                    {{ getStats(type.id).totalDuration || "-" }} min.
-                  </li>
-                </ul>
-              </div>
+              <p class="exercise-description">
+                {{ type.description || "Brak opisu." }}
+              </p>
             </div>
+          </div>
+          <div class="exercise-actions">
+            <button @click="editType(type)" class="edit-button">Edytuj</button>
+            <button @click="deleteType(type.id)" class="delete-button">
+              Usuń
+            </button>
           </div>
         </li>
       </ul>
@@ -104,7 +86,7 @@
 import { defineComponent, ref, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { ExerciseType, TrainingRecord, PlannedExercise } from "@/store";
+import { ExerciseType, TrainingRecord } from "@/store";
 
 export default defineComponent({
   name: "ExerciseTypesView",
@@ -112,28 +94,32 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
 
-    const newExercise = ref<Omit<ExerciseType, "id">>({
+    const getInitialFormState = (): Partial<ExerciseType> => ({
       name: "",
-      category: "" as "cardio" | "strength" | "flexibility" | "recovery",
+      category: "" as any,
       description: "",
       imageUrl: "",
     });
 
+    const exerciseForm = ref<Partial<ExerciseType>>(getInitialFormState());
+    const isEditing = ref(false);
+
     const allExerciseTypes = computed<ExerciseType[]>(
       () => store.getters.allExerciseTypes
     );
-    const trainingHistory = computed<TrainingRecord[]>(
-      () => store.getters.allTrainingHistory
-    );
+
+    const resetForm = () => {
+      exerciseForm.value = getInitialFormState();
+      isEditing.value = false;
+    };
 
     const handleFormSubmit = () => {
-      store.dispatch("addExerciseType", newExercise.value);
-      newExercise.value = {
-        name: "",
-        category: "" as "cardio" | "strength" | "flexibility" | "recovery",
-        description: "",
-        imageUrl: "",
-      };
+      if (isEditing.value) {
+        store.dispatch("updateExerciseType", exerciseForm.value);
+      } else {
+        store.dispatch("addExerciseType", exerciseForm.value);
+      }
+      resetForm();
     };
 
     const getCategoryName = (category: string) => {
@@ -155,89 +141,71 @@ export default defineComponent({
       router.back();
     };
 
-    // NOWA FUNKCJA DO OBLICZANIA STATYSTYK
-    const getStats = (typeId: string) => {
-      const exerciseType = allExerciseTypes.value.find(
-        (type) => type.id === typeId
-      );
-      if (!exerciseType) {
-        return { usageCount: 0 };
+    const editType = (type: ExerciseType) => {
+      isEditing.value = true;
+      exerciseForm.value = { ...type };
+      window.scrollTo(0, 0);
+    };
+
+    const cancelEdit = () => {
+      resetForm();
+    };
+
+    const deleteType = (typeId: string) => {
+      if (
+        confirm(
+          "Czy na pewno chcesz usunąć to ćwiczenie? Spowoduje to również usunięcie go ze wszystkich szablonów i historii treningów."
+        )
+      ) {
+        store.dispatch("deleteExerciseType", typeId);
       }
-
-      const stats = {
-        usageCount: 0,
-        totalSets: 0,
-        totalReps: 0,
-        totalWeight: 0,
-        maxWeight: 0,
-        totalDuration: 0,
-        avgReps: 0,
-        avgWeight: 0,
-        category: exerciseType.category,
-      };
-
-      // Przechodzimy przez całą historię treningów
-      trainingHistory.value.forEach((training) => {
-        training.exercises.forEach((exercise) => {
-          // Liczymy wystąpienia danego typu ćwiczenia
-          if (exercise.exerciseTypeId === typeId) {
-            stats.usageCount++;
-
-            // Obliczamy statystyki w zależności od kategorii
-            if (exercise.category === "strength" && exercise.sets) {
-              stats.totalSets += exercise.sets.length;
-              exercise.sets.forEach((set) => {
-                if (set.done) {
-                  stats.totalReps += set.reps || 0;
-                  stats.totalWeight += (set.weight || 0) * (set.reps || 0);
-                  if (set.weight && set.weight > stats.maxWeight) {
-                    stats.maxWeight = set.weight;
-                  }
-                }
-              });
-            } else if (exercise.category === "cardio" && exercise.done) {
-              stats.totalDuration += exercise.duration || 0;
-            } else if (exercise.category === "flexibility" && exercise.done) {
-              stats.totalReps += exercise.reps || 0;
-              stats.totalDuration += exercise.duration || 0;
-            } else if (exercise.category === "recovery" && exercise.done) {
-              stats.totalDuration += exercise.duration || 0;
-            }
-          }
-        });
-      });
-
-      // Obliczanie wartości średnich (unikamy dzielenia przez zero)
-      if (stats.totalSets > 0) {
-        stats.avgReps = stats.totalReps / stats.totalSets;
-      }
-      if (stats.totalWeight > 0) {
-        // Obliczenie średniej wagi może być bardziej złożone, zależy od tego, jak chcemy liczyć.
-        // Na razie prosta średnia w oparciu o wagę*reps
-        const totalVolume = stats.totalWeight;
-        const totalReps = stats.totalReps;
-        if (totalReps > 0) {
-          stats.avgWeight = totalVolume / totalReps;
-        }
-      }
-
-      return stats;
     };
 
     return {
-      newExercise,
+      exerciseForm,
+      isEditing,
       allExerciseTypes,
-      trainingHistory,
       handleFormSubmit,
       getCategoryName,
       goBack,
-      getStats,
+      editType,
+      cancelEdit,
+      deleteType,
     };
   },
 });
 </script>
 
 <style scoped>
+.cancel-button {
+  background-color: #6c757d;
+  margin-top: 10px;
+}
+.exercise-item {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.exercise-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.exercise-actions button {
+  padding: 3px 8px;
+  font-size: 0.8em;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+}
+.edit-button {
+  background-color: #ffc107;
+}
+.delete-button {
+  background-color: #dc3545;
+  color: white;
+}
 .page-container {
   padding: 20px;
   text-align: center;
@@ -318,7 +286,8 @@ textarea {
   box-sizing: border-box;
 }
 
-.submit-button {
+.submit-button,
+.cancel-button {
   background-color: #42b983;
   color: white;
   border: none;
@@ -345,14 +314,13 @@ textarea {
   padding: 15px;
   margin-bottom: 15px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-  display: flex;
-  gap: 15px;
 }
 
 .exercise-content {
   display: flex;
   align-items: center;
   gap: 15px;
+  flex-grow: 1;
 }
 
 .exercise-image {
@@ -386,27 +354,5 @@ textarea {
   color: #555;
   font-size: 0.9em;
   line-height: 1.5;
-}
-
-.exercise-stats {
-  margin-top: 15px;
-  border-top: 1px solid #ddd;
-  padding-top: 10px;
-}
-
-.exercise-stats p {
-  margin: 0;
-}
-
-.exercise-stats ul {
-  list-style-type: none;
-  padding: 0;
-  margin-top: 5px;
-  font-size: 0.9em;
-}
-
-.exercise-stats li {
-  color: #666;
-  margin-bottom: 3px;
 }
 </style>

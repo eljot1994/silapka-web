@@ -1,5 +1,4 @@
 import { createStore } from "vuex";
-import router from "../router";
 import { auth, db } from "@/firebase";
 import {
   createUserWithEmailAndPassword,
@@ -16,6 +15,7 @@ import {
 } from "firebase/firestore";
 import { v4 as uuidv4 } from "uuid";
 
+// --- INTERFEJSY ---
 interface User {
   uid: string;
   email: string;
@@ -57,6 +57,13 @@ export interface PlannedExercise {
 export interface TrainingRecord {
   id: string;
   date: string;
+  duration: string;
+  exercises: PlannedExercise[];
+}
+
+export interface TrainingTemplate {
+  id: string;
+  name: string;
   exercises: PlannedExercise[];
 }
 
@@ -66,9 +73,13 @@ interface State {
   exerciseTypes: ExerciseType[];
   currentTraining: PlannedExercise[];
   trainingHistory: TrainingRecord[];
+  trainingTemplates: TrainingTemplate[];
+  isTrainingActive: boolean;
+  trainingStartTime: number | null;
   userStats: any;
 }
 
+// --- STORE ---
 export default createStore<State>({
   state: {
     currentUser: null,
@@ -76,8 +87,12 @@ export default createStore<State>({
     exerciseTypes: [],
     currentTraining: [],
     trainingHistory: [],
+    trainingTemplates: [],
+    isTrainingActive: false,
+    trainingStartTime: null,
     userStats: {},
   },
+
   getters: {
     isAuthenticated: (state) => !!state.currentUser,
     currentUser: (state) => state.currentUser,
@@ -87,8 +102,11 @@ export default createStore<State>({
       state.exerciseTypes.find((type) => type.id === id),
     currentPlannedTraining: (state) => state.currentTraining,
     allTrainingHistory: (state) => state.trainingHistory,
+    allTrainingTemplates: (state) => state.trainingTemplates,
+    isTrainingActive: (state) => state.isTrainingActive,
     getUserStats: (state) => state.userStats,
   },
+
   mutations: {
     SET_USER(state, user: User | null) {
       state.currentUser = user;
@@ -101,6 +119,17 @@ export default createStore<State>({
     },
     ADD_EXERCISE_TYPE(state, type: ExerciseType) {
       state.exerciseTypes.push(type);
+    },
+    UPDATE_EXERCISE_TYPE(state, updatedType: ExerciseType) {
+      const index = state.exerciseTypes.findIndex(
+        (t) => t.id === updatedType.id
+      );
+      if (index !== -1) {
+        state.exerciseTypes[index] = updatedType;
+      }
+    },
+    REMOVE_EXERCISE_TYPE(state, typeId: string) {
+      state.exerciseTypes = state.exerciseTypes.filter((t) => t.id !== typeId);
     },
     SET_CURRENT_TRAINING(state, exercises: PlannedExercise[]) {
       state.currentTraining = exercises;
@@ -157,12 +186,37 @@ export default createStore<State>({
       state.trainingHistory = history;
     },
     ADD_TRAINING_TO_HISTORY(state, training: TrainingRecord) {
-      state.trainingHistory.push(training);
+      state.trainingHistory.unshift(training); // *** ZMIANA Z .push na .unshift ***
+    },
+    REMOVE_TRAINING_FROM_HISTORY(state, trainingId: string) {
+      state.trainingHistory = state.trainingHistory.filter(
+        (t) => t.id !== trainingId
+      );
     },
     CLEAR_CURRENT_TRAINING(state) {
       state.currentTraining = [];
     },
+    SET_TRAINING_ACTIVE(state, status: boolean) {
+      state.isTrainingActive = status;
+      if (status) {
+        state.trainingStartTime = Date.now();
+      } else {
+        state.trainingStartTime = null;
+      }
+    },
+    SET_TRAINING_TEMPLATES(state, templates: TrainingTemplate[]) {
+      state.trainingTemplates = templates;
+    },
+    ADD_TRAINING_TEMPLATE(state, template: TrainingTemplate) {
+      state.trainingTemplates.push(template);
+    },
+    REMOVE_TEMPLATE(state, templateId: string) {
+      state.trainingTemplates = state.trainingTemplates.filter(
+        (t) => t.id !== templateId
+      );
+    },
   },
+
   actions: {
     async signup({ commit }, { email, password }) {
       const res = await createUserWithEmailAndPassword(auth, email, password);
@@ -173,6 +227,7 @@ export default createStore<State>({
           exerciseTypes: [],
           currentTraining: [],
           trainingHistory: [],
+          trainingTemplates: [],
         });
         commit("SET_USER", { uid: res.user.uid, email: res.user.email });
       } else {
@@ -193,6 +248,8 @@ export default createStore<State>({
       commit("SET_EXERCISE_TYPES", []);
       commit("SET_CURRENT_TRAINING", []);
       commit("SET_TRAINING_HISTORY", []);
+      commit("SET_TRAINING_TEMPLATES", []);
+      commit("SET_TRAINING_ACTIVE", false);
     },
     async fetchUserData({ commit, state }) {
       if (state.currentUser) {
@@ -203,6 +260,7 @@ export default createStore<State>({
           commit("SET_EXERCISE_TYPES", data.exerciseTypes || []);
           commit("SET_CURRENT_TRAINING", data.currentTraining || []);
           commit("SET_TRAINING_HISTORY", data.trainingHistory || []);
+          commit("SET_TRAINING_TEMPLATES", data.trainingTemplates || []);
         }
       }
     },
@@ -214,6 +272,28 @@ export default createStore<State>({
           exerciseTypes: arrayUnion(newType),
         });
         commit("ADD_EXERCISE_TYPE", newType);
+      }
+    },
+    async updateExerciseType({ commit, state }, updatedType: ExerciseType) {
+      if (state.currentUser) {
+        const userRef = doc(db, "users", state.currentUser.uid);
+        const updatedTypes = state.exerciseTypes.map((t) =>
+          t.id === updatedType.id ? updatedType : t
+        );
+        await updateDoc(userRef, { exerciseTypes: updatedTypes });
+        commit("UPDATE_EXERCISE_TYPE", updatedType);
+      }
+    },
+    async deleteExerciseType({ commit, state }, typeId: string) {
+      if (state.currentUser) {
+        const typeToRemove = state.exerciseTypes.find((t) => t.id === typeId);
+        if (typeToRemove) {
+          const userRef = doc(db, "users", state.currentUser.uid);
+          await updateDoc(userRef, {
+            exerciseTypes: arrayRemove(typeToRemove),
+          });
+          commit("REMOVE_EXERCISE_TYPE", typeId);
+        }
       }
     },
     async addExerciseToPlan(
@@ -260,9 +340,7 @@ export default createStore<State>({
         );
         if (index !== -1) {
           currentTraining[index] = updatedExercise;
-          await updateDoc(userRef, {
-            currentTraining: currentTraining,
-          });
+          await updateDoc(userRef, { currentTraining: currentTraining });
           commit("UPDATE_EXERCISE_IN_PLAN", updatedExercise);
         }
       }
@@ -349,9 +427,22 @@ export default createStore<State>({
           );
         }
 
+        const endTime = Date.now();
+        const startTime = state.trainingStartTime || endTime;
+        const durationInSeconds = Math.round((endTime - startTime) / 1000);
+        const hours = Math.floor(durationInSeconds / 3600);
+        const minutes = Math.floor((durationInSeconds % 3600) / 60);
+        const seconds = durationInSeconds % 60;
+        const durationFormatted = `${hours
+          .toString()
+          .padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds
+          .toString()
+          .padStart(2, "0")}`;
+
         const completedTraining: TrainingRecord = {
           id: uuidv4(),
           date: new Date().toLocaleDateString("pl-PL"),
+          duration: durationFormatted,
           exercises: state.currentTraining,
         };
 
@@ -363,6 +454,69 @@ export default createStore<State>({
 
         commit("ADD_TRAINING_TO_HISTORY", completedTraining);
         commit("CLEAR_CURRENT_TRAINING");
+        commit("SET_TRAINING_ACTIVE", false);
+      }
+    },
+    async deleteTrainingFromHistory({ commit, state }, trainingId: string) {
+      if (state.currentUser) {
+        const trainingToRemove = state.trainingHistory.find(
+          (t) => t.id === trainingId
+        );
+        if (trainingToRemove) {
+          const userRef = doc(db, "users", state.currentUser.uid);
+          await updateDoc(userRef, {
+            trainingHistory: arrayRemove(trainingToRemove),
+          });
+          commit("REMOVE_TRAINING_FROM_HISTORY", trainingId);
+        }
+      }
+    },
+    async saveCurrentTrainingAsTemplate(
+      { commit, state },
+      templateName: string
+    ) {
+      if (state.currentUser && state.currentTraining.length > 0) {
+        const newTemplate: TrainingTemplate = {
+          id: uuidv4(),
+          name: templateName,
+          exercises: JSON.parse(JSON.stringify(state.currentTraining)),
+        };
+        const userRef = doc(db, "users", state.currentUser.uid);
+        await updateDoc(userRef, {
+          trainingTemplates: arrayUnion(newTemplate),
+        });
+        commit("ADD_TRAINING_TEMPLATE", newTemplate);
+      }
+    },
+    async loadTemplateIntoCurrentTraining(
+      { commit, state },
+      templateId: string
+    ) {
+      if (state.currentUser) {
+        const template = state.trainingTemplates.find(
+          (t) => t.id === templateId
+        );
+        if (template) {
+          const userRef = doc(db, "users", state.currentUser.uid);
+          await updateDoc(userRef, {
+            currentTraining: template.exercises,
+          });
+          commit("SET_CURRENT_TRAINING", template.exercises);
+        }
+      }
+    },
+    async deleteTemplate({ commit, state }, templateId: string) {
+      if (state.currentUser) {
+        const templateToRemove = state.trainingTemplates.find(
+          (t) => t.id === templateId
+        );
+        if (templateToRemove) {
+          const userRef = doc(db, "users", state.currentUser.uid);
+          await updateDoc(userRef, {
+            trainingTemplates: arrayRemove(templateToRemove),
+          });
+          commit("REMOVE_TEMPLATE", templateId);
+        }
       }
     },
   },

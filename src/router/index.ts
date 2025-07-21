@@ -1,11 +1,12 @@
 import { createRouter, createWebHistory, RouteRecordRaw } from "vue-router";
 import HomeView from "../views/HomeView.vue";
 import WelcomeView from "../views/WelcomeView.vue";
-import AddExerciseView from "../views/AddExerciseView.vue"; // Nowy import
-import FinishTrainingView from "../views/FinishTrainingView.vue"; // Nowy import
-import HistoryView from "../views/HistoryView.vue"; // Nowy import
-import ExerciseTypesView from "../views/ExerciseTypesView.vue"; // Nowy import
-import StatsView from "../views/StatsView.vue"; // Dodaj ten import
+import AddExerciseView from "../views/AddExerciseView.vue";
+import FinishTrainingView from "../views/FinishTrainingView.vue";
+import HistoryView from "../views/HistoryView.vue";
+import ExerciseTypesView from "../views/ExerciseTypesView.vue";
+import StatsView from "../views/StatsView.vue";
+import TemplatesView from "../views/TemplatesView.vue"; // NOWY IMPORT
 import store from "../store";
 
 const routes: Array<RouteRecordRaw> = [
@@ -34,7 +35,7 @@ const routes: Array<RouteRecordRaw> = [
     },
   },
   {
-    path: "/add-exercise", // Nowa ścieżka
+    path: "/add-exercise",
     name: "add-exercise",
     component: AddExerciseView,
     beforeEnter: (to, from, next) => {
@@ -46,7 +47,7 @@ const routes: Array<RouteRecordRaw> = [
     },
   },
   {
-    path: "/finish-training", // Nowa ścieżka
+    path: "/finish-training",
     name: "finish-training",
     component: FinishTrainingView,
     beforeEnter: (to, from, next) => {
@@ -58,7 +59,7 @@ const routes: Array<RouteRecordRaw> = [
     },
   },
   {
-    path: "/history", // Nowa ścieżka
+    path: "/history",
     name: "history",
     component: HistoryView,
     beforeEnter: (to, from, next) => {
@@ -70,7 +71,7 @@ const routes: Array<RouteRecordRaw> = [
     },
   },
   {
-    path: "/exercise-types", // Nowa ścieżka
+    path: "/exercise-types",
     name: "exercise-types",
     component: ExerciseTypesView,
     beforeEnter: (to, from, next) => {
@@ -82,9 +83,22 @@ const routes: Array<RouteRecordRaw> = [
     },
   },
   {
-    path: "/stats", // NOWA TRASA DLA STATYSTYK
+    path: "/stats",
     name: "stats",
     component: StatsView,
+    beforeEnter: (to, from, next) => {
+      if (store.getters.isAuthenticated) {
+        next();
+      } else {
+        next({ name: "home" });
+      }
+    },
+  },
+  {
+    // NOWA TRASA
+    path: "/templates",
+    name: "templates",
+    component: TemplatesView,
     beforeEnter: (to, from, next) => {
       if (store.getters.isAuthenticated) {
         next();
@@ -100,9 +114,11 @@ const router = createRouter({
   routes,
 });
 
+// Ta funkcja jest ważna, ale może powodować problemy przy odświeżaniu,
+// jeśli nie ma `initializeAuth`. Na razie ją zostawiamy.
 router.beforeEach(async (to, from, next) => {
   if (!store.state.currentUser && localStorage.getItem("currentUser")) {
-    await store.dispatch("initializeAuth");
+    // Zakładamy, że `onAuthStateChanged` w main.ts obsłuży logowanie
   }
   next();
 });

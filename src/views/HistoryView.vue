@@ -4,13 +4,13 @@
     <button @click="goBack" class="back-button">Wróć</button>
 
     <div class="history-section">
-      <p v-if="trainingHistory.length === 0" class="info-message">
+      <p v-if="sortedTrainingHistory.length === 0" class="info-message">
         Brak zapisanych treningów w historii.
       </p>
 
       <ul v-else class="training-list">
         <li
-          v-for="training in trainingHistory"
+          v-for="training in sortedTrainingHistory"
           :key="training.id"
           class="training-item"
         >
@@ -18,7 +18,14 @@
             <h4>
               Trening z dnia:
               <span class="training-date">{{ training.date }}</span>
+              <br />
+              <small class="training-duration"
+                >Czas trwania: {{ training.duration || "N/A" }}</small
+              >
             </h4>
+            <button @click="deleteTraining(training.id)" class="delete-button">
+              Usuń
+            </button>
           </div>
           <p class="exercises-summary">
             Wykonane ćwiczenia ({{ training.exercises.length }}):
@@ -31,11 +38,12 @@
             >
               <span class="exercise-name-summary">{{ exercise.name }}</span>
               <span
-                v-if="exercise.category === 'strength'"
+                v-if="exercise.category === 'strength' && exercise.sets"
                 class="exercise-details-summary"
               >
                 <span v-for="(set, index) in exercise.sets" :key="set.id">
-                  {{ index + 1 }}. {{ set.weight }}kg x {{ set.reps }} powt.
+                  {{ index + 1 }}. {{ set.weight || 0 }}kg x
+                  {{ set.reps || 0 }} powt.
                   {{ set.done ? "(wyk.)" : "(niewyk.)" }}<br />
                 </span>
               </span>
@@ -85,39 +93,68 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
 
-    const trainingHistory = computed<TrainingRecord[]>(
-      () => store.getters.allTrainingHistory
-    );
+    // Funkcja do konwersji daty w formacie DD.MM.YYYY na obiekt Date
+    const parseDate = (dateString: string) => {
+      const parts = dateString.split(".");
+      // Uwaga: miesiące w obiekcie Date są indeksowane od 0
+      return new Date(
+        parseInt(parts[2], 10),
+        parseInt(parts[1], 10) - 1,
+        parseInt(parts[0], 10)
+      );
+    };
+
+    const sortedTrainingHistory = computed<TrainingRecord[]>(() => {
+      // Tworzymy kopię, aby nie mutować oryginalnego stanu i sortujemy
+      return [...store.getters.allTrainingHistory].sort((a, b) => {
+        const dateA = parseDate(a.date);
+        const dateB = parseDate(b.date);
+        // Sortowanie malejące - od najnowszej do najstarszej
+        return dateB.getTime() - dateA.getTime();
+      });
+    });
 
     const goBack = () => {
       router.back();
     };
 
-    const getCategoryName = (category: string) => {
-      switch (category) {
-        case "strength":
-          return "Siłowe";
-        case "cardio":
-          return "Cardio";
-        case "flexibility":
-          return "Mobilność i Elastyczność";
-        case "recovery":
-          return "Odnowa i Regeneracja";
-        default:
-          return category;
+    const deleteTraining = (trainingId: string) => {
+      if (confirm("Czy na pewno chcesz usunąć ten trening z historii?")) {
+        store.dispatch("deleteTrainingFromHistory", trainingId);
       }
     };
 
     return {
-      trainingHistory,
+      sortedTrainingHistory,
       goBack,
-      getCategoryName,
+      deleteTraining,
     };
   },
 });
 </script>
 
 <style scoped>
+.training-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.delete-button {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.training-duration {
+  font-size: 0.7em;
+  color: #555;
+  font-weight: normal;
+}
 .page-container {
   padding: 20px;
   text-align: center;
@@ -180,10 +217,6 @@ h1 {
   padding: 15px;
   margin-bottom: 20px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-}
-
-.training-header {
-  margin-bottom: 10px;
 }
 
 .training-header h4 {
