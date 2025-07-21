@@ -28,12 +28,23 @@ export type ExerciseCategory =
   | "flexibility"
   | "recovery";
 
+export interface SessionSet {
+  weight: number | null;
+  reps: number | null;
+  done: boolean;
+}
+
 export interface ExerciseType {
   id: string;
   name: string;
   category: ExerciseCategory;
   description: string;
   imageUrl?: string;
+  parties?: string[];
+  lastUsedDate?: string;
+  lastUsedSets?: SessionSet[];
+  lastUsedDuration?: number | null;
+  lastUsedReps?: number | null;
 }
 
 export interface Set {
@@ -67,6 +78,10 @@ export interface TrainingTemplate {
   exercises: PlannedExercise[];
 }
 
+export interface LastTrainedParties {
+  [party: string]: number;
+}
+
 interface State {
   currentUser: User | null;
   authIsReady: boolean;
@@ -76,11 +91,13 @@ interface State {
   trainingTemplates: TrainingTemplate[];
   isTrainingActive: boolean;
   trainingStartTime: number | null;
-  userStats: any;
+  lastTrainedParties: LastTrainedParties;
+  isRestTimerActive: boolean;
+  restTimerSeconds: number;
+  restTimerInterval: number | null;
 }
 
-// --- STORE ---
-export default createStore<State>({
+const store = createStore<State>({
   state: {
     currentUser: null,
     authIsReady: false,
@@ -90,7 +107,10 @@ export default createStore<State>({
     trainingTemplates: [],
     isTrainingActive: false,
     trainingStartTime: null,
-    userStats: {},
+    lastTrainedParties: {},
+    isRestTimerActive: false,
+    restTimerSeconds: 0,
+    restTimerInterval: null,
   },
 
   getters: {
@@ -104,7 +124,9 @@ export default createStore<State>({
     allTrainingHistory: (state) => state.trainingHistory,
     allTrainingTemplates: (state) => state.trainingTemplates,
     isTrainingActive: (state) => state.isTrainingActive,
-    getUserStats: (state) => state.userStats,
+    lastTrainedParties: (state) => state.lastTrainedParties,
+    isRestTimerActive: (state) => state.isRestTimerActive,
+    restTimerSeconds: (state) => state.restTimerSeconds,
   },
 
   mutations: {
@@ -186,7 +208,7 @@ export default createStore<State>({
       state.trainingHistory = history;
     },
     ADD_TRAINING_TO_HISTORY(state, training: TrainingRecord) {
-      state.trainingHistory.unshift(training); // *** ZMIANA Z .push na .unshift ***
+      state.trainingHistory.unshift(training);
     },
     REMOVE_TRAINING_FROM_HISTORY(state, trainingId: string) {
       state.trainingHistory = state.trainingHistory.filter(
@@ -215,9 +237,44 @@ export default createStore<State>({
         (t) => t.id !== templateId
       );
     },
+    SET_LAST_TRAINED_PARTIES(state, parties: LastTrainedParties) {
+      state.lastTrainedParties = parties;
+    },
+    SET_REST_TIMER_ACTIVE(state, isActive: boolean) {
+      state.isRestTimerActive = isActive;
+    },
+    SET_REST_TIMER_SECONDS(state, seconds: number) {
+      state.restTimerSeconds = seconds;
+    },
+    SET_REST_TIMER_INTERVAL(state, interval: number | null) {
+      state.restTimerInterval = interval;
+    },
+    CLEAR_REST_TIMER_INTERVAL(state) {
+      if (state.restTimerInterval) {
+        clearInterval(state.restTimerInterval);
+        state.restTimerInterval = null;
+      }
+    },
   },
 
   actions: {
+    startRestTimer({ commit, dispatch, state }, duration = 60) {
+      dispatch("stopRestTimer");
+      commit("SET_REST_TIMER_SECONDS", duration);
+      commit("SET_REST_TIMER_ACTIVE", true);
+
+      const interval = setInterval(() => {
+        commit("SET_REST_TIMER_SECONDS", state.restTimerSeconds - 1);
+        if (state.restTimerSeconds <= 0) {
+          dispatch("stopRestTimer");
+        }
+      }, 1000);
+      commit("SET_REST_TIMER_INTERVAL", interval as any);
+    },
+    stopRestTimer({ commit }) {
+      commit("CLEAR_REST_TIMER_INTERVAL");
+      commit("SET_REST_TIMER_ACTIVE", false);
+    },
     async signup({ commit }, { email, password }) {
       const res = await createUserWithEmailAndPassword(auth, email, password);
       if (res.user) {
@@ -228,6 +285,7 @@ export default createStore<State>({
           currentTraining: [],
           trainingHistory: [],
           trainingTemplates: [],
+          lastTrainedParties: {},
         });
         commit("SET_USER", { uid: res.user.uid, email: res.user.email });
       } else {
@@ -250,6 +308,7 @@ export default createStore<State>({
       commit("SET_TRAINING_HISTORY", []);
       commit("SET_TRAINING_TEMPLATES", []);
       commit("SET_TRAINING_ACTIVE", false);
+      commit("SET_LAST_TRAINED_PARTIES", {});
     },
     async fetchUserData({ commit, state }) {
       if (state.currentUser) {
@@ -261,12 +320,17 @@ export default createStore<State>({
           commit("SET_CURRENT_TRAINING", data.currentTraining || []);
           commit("SET_TRAINING_HISTORY", data.trainingHistory || []);
           commit("SET_TRAINING_TEMPLATES", data.trainingTemplates || []);
+          commit("SET_LAST_TRAINED_PARTIES", data.lastTrainedParties || {});
         }
       }
     },
     async addExerciseType({ commit, state }, type: Omit<ExerciseType, "id">) {
       if (state.currentUser) {
-        const newType: ExerciseType = { ...type, id: uuidv4() };
+        const newType: ExerciseType = {
+          ...type,
+          id: uuidv4(),
+          parties: type.parties || [],
+        };
         const userRef = doc(db, "users", state.currentUser.uid);
         await updateDoc(userRef, {
           exerciseTypes: arrayUnion(newType),
@@ -298,13 +362,11 @@ export default createStore<State>({
     },
     async addExerciseToPlan(
       { commit, state, getters },
-      { exerciseTypeId, params }: { exerciseTypeId: string; params: any }
+      exerciseTypeId: string
     ) {
       if (state.currentUser) {
         const exerciseType = getters.getExerciseTypeById(exerciseTypeId);
-        if (!exerciseType) {
-          throw new Error("Exercise type not found.");
-        }
+        if (!exerciseType) throw new Error("Exercise type not found.");
 
         const newExercise: PlannedExercise = {
           id: uuidv4(),
@@ -312,13 +374,20 @@ export default createStore<State>({
           name: exerciseType.name,
           category: exerciseType.category,
           done: false,
-          ...params,
+          sets:
+            exerciseType.category === "strength"
+              ? exerciseType.lastUsedSets?.map((s: SessionSet) => ({
+                  ...s,
+                  id: uuidv4(),
+                  done: false,
+                })) || [{ id: uuidv4(), weight: null, reps: null, done: false }]
+              : undefined,
+          duration: exerciseType.lastUsedDuration || null,
+          reps: exerciseType.lastUsedReps || null,
         };
 
-        if (newExercise.category === "strength") {
-          newExercise.sets = [
-            { id: uuidv4(), weight: null, reps: null, done: false },
-          ];
+        if (newExercise.category !== "strength") {
+          delete newExercise.sets;
         }
 
         const userRef = doc(db, "users", state.currentUser.uid);
@@ -359,24 +428,33 @@ export default createStore<State>({
         }
       }
     },
-    async addSet({ commit, state }, { exerciseId, weight, reps }) {
+    async addSet({ commit, state }, { exerciseId }: { exerciseId: string }) {
       if (state.currentUser) {
-        const exercise = state.currentTraining.find(
-          (ex) => ex.id === exerciseId
+        const currentTraining = JSON.parse(
+          JSON.stringify(state.currentTraining)
         );
-        if (exercise && exercise.sets) {
-          const newSet = { id: uuidv4(), weight, reps, done: false };
-          const updatedExercise = {
-            ...exercise,
-            sets: [...exercise.sets, newSet],
-          };
-          const userRef = doc(db, "users", state.currentUser.uid);
-          await updateDoc(userRef, {
-            currentTraining: state.currentTraining.map((ex) =>
-              ex.id === exerciseId ? updatedExercise : ex
-            ),
-          });
-          commit("ADD_SET", { exerciseId, newSet });
+        const exerciseIndex = currentTraining.findIndex(
+          (ex: PlannedExercise) => ex.id === exerciseId
+        );
+
+        if (exerciseIndex > -1) {
+          const exercise = currentTraining[exerciseIndex];
+          if (exercise.sets) {
+            const lastSet = exercise.sets[exercise.sets.length - 1];
+            const newSet = {
+              id: uuidv4(),
+              weight: lastSet ? lastSet.weight : null,
+              reps: lastSet ? lastSet.reps : null,
+              done: false,
+            };
+            exercise.sets.push(newSet);
+
+            const userRef = doc(db, "users", state.currentUser.uid);
+            await updateDoc(userRef, {
+              currentTraining: currentTraining,
+            });
+            commit("SET_CURRENT_TRAINING", currentTraining);
+          }
         }
       }
     },
@@ -420,7 +498,9 @@ export default createStore<State>({
     },
     async finishCurrentTraining({ commit, state }) {
       if (state.currentUser) {
-        const hasAnyExerciseDone = state.currentTraining.some((ex) => ex.done);
+        const hasAnyExerciseDone = state.currentTraining.some(
+          (ex) => ex.done || (ex.sets && ex.sets.some((s) => s.done))
+        );
         if (!hasAnyExerciseDone) {
           throw new Error(
             "Nie możesz zakończyć treningu bez wykonania żadnego ćwiczenia."
@@ -429,6 +509,7 @@ export default createStore<State>({
 
         const endTime = Date.now();
         const startTime = state.trainingStartTime || endTime;
+        const currentDate = new Date().toLocaleDateString("pl-PL");
         const durationInSeconds = Math.round((endTime - startTime) / 1000);
         const hours = Math.floor(durationInSeconds / 3600);
         const minutes = Math.floor((durationInSeconds % 3600) / 60);
@@ -439,9 +520,42 @@ export default createStore<State>({
           .toString()
           .padStart(2, "0")}`;
 
+        const newLastTrainedParties: LastTrainedParties = {
+          ...state.lastTrainedParties,
+        };
+        const updatedExerciseTypes = JSON.parse(
+          JSON.stringify(state.exerciseTypes)
+        );
+
+        state.currentTraining.forEach((exercise) => {
+          if (
+            exercise.done ||
+            (exercise.sets && exercise.sets.some((s) => s.done))
+          ) {
+            const typeIndex = updatedExerciseTypes.findIndex(
+              (t: ExerciseType) => t.id === exercise.exerciseTypeId
+            );
+            if (typeIndex > -1) {
+              const updatedType = updatedExerciseTypes[typeIndex];
+              updatedType.lastUsedDate = currentDate;
+              updatedType.lastUsedSets = exercise.sets
+                ? exercise.sets.map(({ id, ...rest }) => rest)
+                : undefined;
+              updatedType.lastUsedDuration = exercise.duration;
+              updatedType.lastUsedReps = exercise.reps;
+
+              if (updatedType.parties) {
+                updatedType.parties.forEach((party: string) => {
+                  newLastTrainedParties[party] = endTime;
+                });
+              }
+            }
+          }
+        });
+
         const completedTraining: TrainingRecord = {
           id: uuidv4(),
-          date: new Date().toLocaleDateString("pl-PL"),
+          date: currentDate,
           duration: durationFormatted,
           exercises: state.currentTraining,
         };
@@ -450,9 +564,13 @@ export default createStore<State>({
         await updateDoc(userRef, {
           trainingHistory: arrayUnion(completedTraining),
           currentTraining: [],
+          exerciseTypes: updatedExerciseTypes,
+          lastTrainedParties: newLastTrainedParties,
         });
 
         commit("ADD_TRAINING_TO_HISTORY", completedTraining);
+        commit("SET_EXERCISE_TYPES", updatedExerciseTypes);
+        commit("SET_LAST_TRAINED_PARTIES", newLastTrainedParties);
         commit("CLEAR_CURRENT_TRAINING");
         commit("SET_TRAINING_ACTIVE", false);
       }
@@ -521,3 +639,5 @@ export default createStore<State>({
     },
   },
 });
+
+export default store;

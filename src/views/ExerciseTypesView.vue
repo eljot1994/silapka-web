@@ -22,6 +22,21 @@
             <option value="recovery">Odnowa i Regeneracja</option>
           </select>
         </div>
+
+        <div class="form-group" v-if="exerciseForm.category === 'strength'">
+          <label for="parties">Partie mięśniowe:</label>
+          <select id="parties" v-model="exerciseForm.parties" multiple>
+            <option
+              v-for="partia in partieMiesniowe"
+              :key="partia"
+              :value="partia"
+            >
+              {{ partia }}
+            </option>
+          </select>
+          <small>Przytrzymaj Ctrl/Cmd, aby zaznaczyć wiele.</small>
+        </div>
+
         <div class="form-group">
           <label for="description">Opis:</label>
           <textarea
@@ -68,6 +83,71 @@
               <p class="exercise-description">
                 {{ type.description || "Brak opisu." }}
               </p>
+              <p
+                v-if="type.parties && type.parties.length > 0"
+                class="exercise-parties"
+              >
+                <strong>Partie:</strong> {{ type.parties.join(", ") }}
+              </p>
+
+              <div class="exercise-stats" v-if="type.lastUsedDate">
+                <p>
+                  <strong>Ostatnio ({{ type.lastUsedDate }}):</strong>
+                </p>
+                <ul>
+                  <li v-if="type.category === 'strength' && type.lastUsedSets">
+                    Serie: {{ type.lastUsedSets.length }}, Max ciężar:
+                    {{ getMaxWeight(type.lastUsedSets) }} kg
+                  </li>
+                  <li
+                    v-if="type.category === 'cardio' && type.lastUsedDuration"
+                  >
+                    Czas: {{ type.lastUsedDuration }} min
+                  </li>
+                  <li
+                    v-if="type.category === 'flexibility' && type.lastUsedReps"
+                  >
+                    Powtórzenia: {{ type.lastUsedReps }}
+                  </li>
+                  <li
+                    v-if="
+                      type.category === 'flexibility' && type.lastUsedDuration
+                    "
+                  >
+                    Czas: {{ type.lastUsedDuration }} min
+                  </li>
+                  <li
+                    v-if="type.category === 'recovery' && type.lastUsedDuration"
+                  >
+                    Czas: {{ type.lastUsedDuration }} min
+                  </li>
+                </ul>
+              </div>
+
+              <div class="exercise-stats">
+                <p><strong>Statystyki historyczne:</strong></p>
+                <ul>
+                  <li>
+                    Użyto w treningu: {{ getStats(type.id).usageCount }} razy
+                  </li>
+                  <li v-if="getStats(type.id).category === 'strength'">
+                    Rekordowy ciężar:
+                    {{ getStats(type.id).maxWeight || "-" }} kg
+                  </li>
+                  <li v-if="getStats(type.id).category === 'strength'">
+                    Łącznie serii: {{ getStats(type.id).totalSets || "-" }}
+                  </li>
+                  <li
+                    v-if="
+                      getStats(type.id).category === 'cardio' ||
+                      getStats(type.id).category === 'recovery'
+                    "
+                  >
+                    Łączny czas:
+                    {{ getStats(type.id).totalDuration || "-" }} min.
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
           <div class="exercise-actions">
@@ -86,7 +166,7 @@
 import { defineComponent, ref, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { ExerciseType, TrainingRecord } from "@/store";
+import { ExerciseType, SessionSet, TrainingRecord } from "@/store";
 
 export default defineComponent({
   name: "ExerciseTypesView",
@@ -94,18 +174,36 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
 
+    const partieMiesniowe = ref([
+      "Klatka piersiowa",
+      "Plecy",
+      "Nogi",
+      "Barki",
+      "Biceps",
+      "Triceps",
+      "Brzuch",
+      "Przedramiona",
+      "Łydki",
+    ]);
+
     const getInitialFormState = (): Partial<ExerciseType> => ({
       name: "",
       category: "" as any,
       description: "",
       imageUrl: "",
+      parties: [],
     });
 
     const exerciseForm = ref<Partial<ExerciseType>>(getInitialFormState());
     const isEditing = ref(false);
 
-    const allExerciseTypes = computed<ExerciseType[]>(
-      () => store.getters.allExerciseTypes
+    const allExerciseTypes = computed<ExerciseType[]>(() =>
+      [...store.getters.allExerciseTypes].sort((a, b) =>
+        a.name.localeCompare(b.name)
+      )
+    );
+    const trainingHistory = computed<TrainingRecord[]>(
+      () => store.getters.allTrainingHistory
     );
 
     const resetForm = () => {
@@ -141,6 +239,56 @@ export default defineComponent({
       router.back();
     };
 
+    const getMaxWeight = (sets: SessionSet[] | undefined) => {
+      if (!sets) return 0;
+      return sets.reduce(
+        (max, set) => (set.weight && set.weight > max ? set.weight : max),
+        0
+      );
+    };
+
+    const getStats = (typeId: string) => {
+      const exerciseType = allExerciseTypes.value.find(
+        (type) => type.id === typeId
+      );
+      if (!exerciseType) return { usageCount: 0 };
+
+      const stats = {
+        usageCount: 0,
+        totalSets: 0,
+        maxWeight: 0,
+        totalDuration: 0,
+        category: exerciseType.category,
+      };
+
+      trainingHistory.value.forEach((training) => {
+        training.exercises.forEach((exercise) => {
+          if (
+            exercise.exerciseTypeId === typeId &&
+            (exercise.done ||
+              (exercise.sets && exercise.sets.some((s) => s.done)))
+          ) {
+            stats.usageCount++;
+
+            if (exercise.category === "strength" && exercise.sets) {
+              exercise.sets.forEach((set) => {
+                if (set.done) {
+                  stats.totalSets++;
+                  if (set.weight && set.weight > stats.maxWeight) {
+                    stats.maxWeight = set.weight;
+                  }
+                }
+              });
+            } else if (exercise.category !== "strength" && exercise.done) {
+              stats.totalDuration += exercise.duration || 0;
+            }
+          }
+        });
+      });
+
+      return stats;
+    };
+
     const editType = (type: ExerciseType) => {
       isEditing.value = true;
       exerciseForm.value = { ...type };
@@ -152,11 +300,7 @@ export default defineComponent({
     };
 
     const deleteType = (typeId: string) => {
-      if (
-        confirm(
-          "Czy na pewno chcesz usunąć to ćwiczenie? Spowoduje to również usunięcie go ze wszystkich szablonów i historii treningów."
-        )
-      ) {
+      if (confirm("Czy na pewno chcesz usunąć to ćwiczenie?")) {
         store.dispatch("deleteExerciseType", typeId);
       }
     };
@@ -165,9 +309,12 @@ export default defineComponent({
       exerciseForm,
       isEditing,
       allExerciseTypes,
+      partieMiesniowe,
       handleFormSubmit,
       getCategoryName,
       goBack,
+      getMaxWeight,
+      getStats,
       editType,
       cancelEdit,
       deleteType,
@@ -177,6 +324,7 @@ export default defineComponent({
 </script>
 
 <style scoped>
+/* Style pozostają takie same */
 .cancel-button {
   background-color: #6c757d;
   margin-top: 10px;
@@ -185,12 +333,13 @@ export default defineComponent({
   position: relative;
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
 }
 .exercise-actions {
   display: flex;
   flex-direction: column;
   gap: 5px;
+  flex-shrink: 0;
 }
 .exercise-actions button {
   padding: 3px 8px;
@@ -286,6 +435,15 @@ textarea {
   box-sizing: border-box;
 }
 
+select[multiple] {
+  height: 120px;
+}
+small {
+  font-size: 0.8em;
+  color: #777;
+  margin-top: 5px;
+}
+
 .submit-button,
 .cancel-button {
   background-color: #42b983;
@@ -318,7 +476,7 @@ textarea {
 
 .exercise-content {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 15px;
   flex-grow: 1;
 }
@@ -354,5 +512,32 @@ textarea {
   color: #555;
   font-size: 0.9em;
   line-height: 1.5;
+}
+.exercise-parties {
+  font-size: 0.8em;
+  color: #333;
+  margin-top: 8px;
+}
+
+.exercise-stats {
+  margin-top: 15px;
+  border-top: 1px solid #ddd;
+  padding-top: 10px;
+}
+
+.exercise-stats p {
+  margin: 0;
+}
+
+.exercise-stats ul {
+  list-style-type: none;
+  padding: 0;
+  margin-top: 5px;
+  font-size: 0.9em;
+}
+
+.exercise-stats li {
+  color: #666;
+  margin-bottom: 3px;
 }
 </style>

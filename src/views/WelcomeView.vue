@@ -1,5 +1,10 @@
 <template>
   <div class="welcome-container">
+    <div v-if="isRestTimerActive" class="rest-timer-overlay">
+      <span>Odpoczynek: {{ restTimerSeconds }}s</span>
+      <button @click="stopRestTimer">Pomiń</button>
+    </div>
+
     <h2>Witaj, {{ userEmail }}!</h2>
     <button @click="handleLogout" class="logout-button">Wyloguj</button>
 
@@ -201,10 +206,12 @@ export default defineComponent({
       () => store.getters.currentPlannedTraining
     );
     const finishTrainingError = ref<string | null>(null);
-
     const isTrainingActive = computed(() => store.getters.isTrainingActive);
     const trainingTime = ref("00:00:00");
     let timerInterval: number | undefined;
+
+    const isRestTimerActive = computed(() => store.getters.isRestTimerActive);
+    const restTimerSeconds = computed(() => store.getters.restTimerSeconds);
 
     const startTraining = () => {
       store.commit("SET_TRAINING_ACTIVE", true);
@@ -228,6 +235,7 @@ export default defineComponent({
       if (timerInterval) {
         clearInterval(timerInterval);
       }
+      store.dispatch("stopRestTimer");
     });
 
     const handleLogout = () => {
@@ -235,9 +243,8 @@ export default defineComponent({
       router.push({ name: "home" });
     };
 
-    // --- Metody do oznaczania jako wykonane ---
     const toggleExerciseDone = (exerciseId: string) => {
-      if (!isTrainingActive.value) return; // Zabezpieczenie
+      if (!isTrainingActive.value) return;
       const exercise = currentTraining.value.find((ex) => ex.id === exerciseId);
       if (exercise) {
         if (
@@ -262,13 +269,17 @@ export default defineComponent({
     };
 
     const toggleSetDone = (exerciseId: string, setId: string) => {
-      if (!isTrainingActive.value) return; // Zabezpieczenie
+      if (!isTrainingActive.value) return;
       const exercise = currentTraining.value.find((ex) => ex.id === exerciseId);
       if (exercise && exercise.category === "strength" && exercise.sets) {
         const set = exercise.sets.find((s) => s.id === setId);
         if (set) {
           const updatedSet = { ...set, done: !set.done };
           store.dispatch("updateSet", { exerciseId, updatedSet });
+
+          if (updatedSet.done) {
+            store.dispatch("startRestTimer", 60);
+          }
 
           const allSetsDone = exercise.sets.every((s) => s.done);
           if (exercise.done !== allSetsDone) {
@@ -281,9 +292,12 @@ export default defineComponent({
       }
     };
 
-    // --- Metody do edycji planu (działają zawsze) ---
+    const stopRestTimer = () => {
+      store.dispatch("stopRestTimer");
+    };
+
     const addSet = (exerciseId: string) => {
-      store.dispatch("addSet", { exerciseId, weight: null, reps: null });
+      store.dispatch("addSet", { exerciseId });
     };
 
     const updateSetInStore = (exerciseId: string, set: Set) => {
@@ -306,7 +320,6 @@ export default defineComponent({
       }
     };
 
-    // --- Metody nawigacji i finalizacji ---
     const finishTraining = async () => {
       finishTrainingError.value = null;
       try {
@@ -353,10 +366,13 @@ export default defineComponent({
       finishTrainingError,
       isTrainingActive,
       trainingTime,
+      isRestTimerActive,
+      restTimerSeconds,
       startTraining,
       handleLogout,
       toggleExerciseDone,
       toggleSetDone,
+      stopRestTimer,
       addSet,
       updateSetInStore,
       updateExerciseInStore,
@@ -375,6 +391,29 @@ export default defineComponent({
 </script>
 
 <style scoped>
+.rest-timer-overlay {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background-color: #2c3e50;
+  color: white;
+  padding: 15px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 1.2em;
+  z-index: 1000;
+  gap: 20px;
+}
+.rest-timer-overlay button {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 5px 15px;
+  border-radius: 5px;
+  cursor: pointer;
+}
 .timer {
   font-size: 0.8em;
   font-weight: bold;
@@ -498,6 +537,10 @@ hr {
 }
 .remove-button:hover {
   background-color: #c82333;
+}
+.remove-button:disabled {
+  background-color: #a0a0a0;
+  cursor: not-allowed;
 }
 .exercise-content {
   width: 100%;
