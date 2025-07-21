@@ -1,5 +1,9 @@
 <template>
-  <div class="welcome-container">
+  <div v-if="!authIsReady" class="loading-container">
+    <div class="spinner"></div>
+    <p>Wczytywanie danych...</p>
+  </div>
+  <div v-else class="welcome-container">
     <div v-if="isRestTimerActive" class="rest-timer-overlay">
       <span>Odpoczynek: {{ restTimerSeconds }}s</span>
       <button @click="stopRestTimer">Pomiń</button>
@@ -192,13 +196,16 @@ import { defineComponent, computed, ref, onUnmounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { PlannedExercise, Set } from "@/store";
+import { useToast } from "vue-toastification";
 
 export default defineComponent({
   name: "WelcomeView",
   setup() {
     const store = useStore();
     const router = useRouter();
+    const toast = useToast();
 
+    const authIsReady = computed(() => store.getters.authIsReady);
     const userEmail = computed(
       () => store.getters.currentUser?.email || "Gościu"
     );
@@ -324,9 +331,12 @@ export default defineComponent({
       finishTrainingError.value = null;
       try {
         await store.dispatch("finishCurrentTraining");
-        alert("Trening zakończony i zapisany!");
+        toast.success("Trening zakończony i zapisany!");
         router.push({ name: "history" });
       } catch (error: any) {
+        toast.error(
+          error.message || "Wystąpił błąd podczas kończenia treningu."
+        );
         finishTrainingError.value =
           error.message || "Wystąpił błąd podczas kończenia treningu.";
       }
@@ -352,7 +362,7 @@ export default defineComponent({
       const name = prompt("Podaj nazwę dla szablonu:");
       if (name && name.trim() !== "") {
         store.dispatch("saveCurrentTrainingAsTemplate", name);
-        alert(`Trening zapisany jako szablon "${name}"`);
+        toast.success(`Trening zapisany jako szablon "${name}"`);
       }
     };
 
@@ -361,6 +371,7 @@ export default defineComponent({
     };
 
     return {
+      authIsReady,
       userEmail,
       currentTraining,
       finishTrainingError,
@@ -391,6 +402,31 @@ export default defineComponent({
 </script>
 
 <style scoped>
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 80vh;
+  color: #555;
+}
+.loading-container .spinner {
+  width: 50px;
+  height: 50px;
+  border: 5px solid #f3f3f3;
+  border-top: 5px solid #42b983;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
 .rest-timer-overlay {
   position: fixed;
   bottom: 0;

@@ -1,247 +1,333 @@
 <template>
   <div class="home-container">
-    <header class="app-header">
-      <h1>Siłapka</h1>
-    </header>
+    <h1>Witaj w Siłapce!</h1>
+    <p>Twoim osobistym asystencie treningowym.</p>
 
-    <div class="auth-section">
-      <div class="tab-buttons">
+    <div class="form-container">
+      <div class="form-toggle">
         <button
-          :class="{ active: currentTab === 'login' }"
-          @click="currentTab = 'login'"
+          @click="isLogin = true"
+          :class="{ active: isLogin }"
+          class="toggle-button"
         >
           Logowanie
         </button>
         <button
-          :class="{ active: currentTab === 'register' }"
-          @click="currentTab = 'register'"
+          @click="isLogin = false"
+          :class="{ active: !isLogin }"
+          class="toggle-button"
         >
           Rejestracja
         </button>
       </div>
 
-      <div v-if="currentTab === 'login'" class="auth-form">
-        <h2>Zaloguj się</h2>
-        <form @submit.prevent="handleLogin">
-          <input
-            type="email"
-            v-model="loginEmail"
-            placeholder="Email"
-            required
-          />
-          <input
-            type="password"
-            v-model="loginPassword"
-            placeholder="Hasło"
-            required
-          />
-          <button type="submit">Zaloguj</button>
-          <p v-if="loginError" class="error-message">{{ loginError }}</p>
-        </form>
-      </div>
+      <form v-if="isLogin" @submit.prevent="handleLogin" class="auth-form">
+        <h3>Logowanie</h3>
+        <input type="email" placeholder="Email" v-model="loginForm.email" />
+        <input
+          type="password"
+          placeholder="Hasło"
+          v-model="loginForm.password"
+        />
+        <button type="submit" :disabled="isLoading">
+          <span v-if="!isLoading">Zaloguj się</span>
+          <span v-else class="spinner"></span>
+        </button>
+        <p v-if="authError" class="error-message">{{ authError }}</p>
+      </form>
 
-      <div v-if="currentTab === 'register'" class="auth-form">
-        <h2>Zarejestruj się</h2>
-        <form @submit.prevent="handleRegister">
+      <form v-else @submit.prevent="handleSignup" class="auth-form">
+        <h3>Rejestracja</h3>
+        <div class="form-group">
           <input
             type="email"
-            v-model="registerEmail"
             placeholder="Email"
-            required
+            v-model="signupForm.email"
+            @blur="validateEmail"
           />
+          <p v-if="signupErrors.email" class="validation-error">
+            {{ signupErrors.email }}
+          </p>
+        </div>
+        <div class="form-group">
           <input
             type="password"
-            v-model="registerPassword"
             placeholder="Hasło"
-            required
+            v-model="signupForm.password"
+            @blur="validatePassword"
           />
+          <p v-if="signupErrors.password" class="validation-error">
+            {{ signupErrors.password }}
+          </p>
+        </div>
+        <div class="form-group">
           <input
             type="password"
-            v-model="registerPasswordConfirm"
-            placeholder="Powtórz hasło"
-            required
+            placeholder="Potwierdź hasło"
+            v-model="signupForm.confirmPassword"
+            @blur="validateConfirmPassword"
           />
-          <button type="submit">Zarejestruj</button>
-          <p v-if="registerError" class="error-message">{{ registerError }}</p>
-        </form>
-      </div>
+          <p v-if="signupErrors.confirmPassword" class="validation-error">
+            {{ signupErrors.confirmPassword }}
+          </p>
+        </div>
+        <button type="submit" :disabled="isLoading">
+          <span v-if="!isLoading">Zarejestruj się</span>
+          <span v-else class="spinner"></span>
+        </button>
+        <p v-if="authError" class="error-message">{{ authError }}</p>
+      </form>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue"; // Usunęliśmy 'watch'
+import { defineComponent, ref } from "vue";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
 
 export default defineComponent({
   name: "HomeView",
   setup() {
     const store = useStore();
-    const router = useRouter();
+    const isLogin = ref(true);
+    const authError = ref<string | null>(null);
+    const isLoading = ref(false); // Nowa zmienna do śledzenia ładowania
 
-    // Sprawdź, czy użytkownik jest zalogowany przy ładowaniu HomeView
-    // Jeśli tak, przekieruj go na stronę powitalną
-    if (store.getters.isAuthenticated) {
-      router.replace({ name: "welcome" });
-    }
+    const loginForm = ref({
+      email: "",
+      password: "",
+    });
 
-    const currentTab = ref<"login" | "register">("login");
-    const loginEmail = ref("");
-    const loginPassword = ref("");
-    const registerEmail = ref("");
-    const registerPassword = ref("");
-    const registerPasswordConfirm = ref("");
-    const loginError = ref<string | null>(null);
-    const registerError = ref<string | null>(null);
+    const signupForm = ref({
+      email: "",
+      password: "",
+      confirmPassword: "",
+    });
 
-    // Usunęliśmy 'savedData' oraz powiązane metody i watchery, ponieważ lista nie jest już potrzebna
+    const signupErrors = ref({
+      email: "",
+      password: "",
+      confirmPassword: "",
+    });
 
-    const handleLogin = async () => {
-      loginError.value = null;
-      try {
-        await store.dispatch("login", {
-          email: loginEmail.value,
-          password: loginPassword.value,
-        });
-        // PRZEKIEROWANIE Z KOMPONENTU PO UDANYM LOGOWANIU
-        router.push({ name: "welcome" });
-      } catch (error: any) {
-        loginError.value = error.message || "Wystąpił błąd logowania.";
+    // --- Funkcje Walidacji ---
+    const validateEmail = () => {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!signupForm.value.email) {
+        signupErrors.value.email = "Email jest wymagany.";
+      } else if (!emailRegex.test(signupForm.value.email)) {
+        signupErrors.value.email = "Niepoprawny format email.";
+      } else {
+        signupErrors.value.email = "";
       }
     };
 
-    const handleRegister = async () => {
-      registerError.value = null;
-      if (registerPassword.value !== registerPasswordConfirm.value) {
-        registerError.value = "Hasła nie pasują do siebie!";
-        return;
+    const validatePassword = () => {
+      if (!signupForm.value.password) {
+        signupErrors.value.password = "Hasło jest wymagane.";
+      } else if (signupForm.value.password.length < 6) {
+        signupErrors.value.password = "Hasło musi mieć co najmniej 6 znaków.";
+      } else {
+        signupErrors.value.password = "";
       }
+      validateConfirmPassword();
+    };
+
+    const validateConfirmPassword = () => {
+      if (!signupForm.value.confirmPassword) {
+        signupErrors.value.confirmPassword =
+          "Potwierdzenie hasła jest wymagane.";
+      } else if (
+        signupForm.value.password !== signupForm.value.confirmPassword
+      ) {
+        signupErrors.value.confirmPassword = "Hasła nie są identyczne.";
+      } else {
+        signupErrors.value.confirmPassword = "";
+      }
+    };
+
+    const isSignupFormValid = () => {
+      validateEmail();
+      validatePassword();
+      validateConfirmPassword();
+      return (
+        !signupErrors.value.email &&
+        !signupErrors.value.password &&
+        !signupErrors.value.confirmPassword
+      );
+    };
+
+    const handleLogin = async () => {
+      authError.value = null;
+      isLoading.value = true;
       try {
-        await store.dispatch("signup", {
-          email: registerEmail.value,
-          password: registerPassword.value,
-        });
-        currentTab.value = "login";
-        registerEmail.value = "";
-        registerPassword.value = "";
-        registerPasswordConfirm.value = "";
+        await store.dispatch("login", loginForm.value);
       } catch (error: any) {
-        // Poprawiony komunikat błędu
-        if (error.code === "auth/email-already-in-use") {
-          registerError.value = "Podany adres e-mail jest już używany.";
-        } else if (error.code === "auth/weak-password") {
-          registerError.value =
-            "Hasło jest zbyt słabe. Użyj co najmniej 6 znaków.";
-        } else {
-          registerError.value =
-            error.message || "Wystąpił nieznany błąd rejestracji.";
+        authError.value = "Nie udało się zalogować. Sprawdź email i hasło.";
+      } finally {
+        isLoading.value = false;
+      }
+    };
+
+    const handleSignup = async () => {
+      authError.value = null;
+      if (isSignupFormValid()) {
+        isLoading.value = true;
+        try {
+          await store.dispatch("signup", {
+            email: signupForm.value.email,
+            password: signupForm.value.password,
+          });
+        } catch (error: any) {
+          authError.value = "Nie udało się zarejestrować. Spróbuj ponownie.";
+        } finally {
+          isLoading.value = false;
         }
       }
     };
 
     return {
-      currentTab,
-      loginEmail,
-      loginPassword,
-      registerEmail,
-      registerPassword,
-      registerPasswordConfirm,
-      loginError,
-      registerError,
+      isLogin,
+      authError,
+      isLoading,
+      loginForm,
+      signupForm,
+      signupErrors,
       handleLogin,
-      handleRegister,
+      handleSignup,
+      validateEmail,
+      validatePassword,
+      validateConfirmPassword,
     };
   },
 });
 </script>
 
 <style scoped>
-/* Style pozostały bez zmian, dodaj tylko styl dla komunikatu o błędzie */
-.error-message {
-  color: #dc3545;
-  margin-top: 10px;
-  font-size: 0.9em;
+/* ... (style z poprzedniej odpowiedzi bez zmian) ... */
+.spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 1s ease-in-out infinite;
 }
 
-/* Pozostałe style z poprzedniego kroku, usunięto te dla data-section */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* ... (reszta stylów bez zmian) ... */
 .home-container {
-  padding: 20px;
-  max-width: 600px;
-  margin: 0 auto;
+  text-align: center;
+  padding: 40px 20px;
 }
 
-.app-header {
-  margin-bottom: 30px;
-}
-
-.app-header h1 {
+h1 {
   font-size: 2.5em;
-  color: #42b983;
-  margin-bottom: 5px;
+  color: #2c3e50;
 }
 
-.app-header p {
+p {
   color: #666;
+  font-size: 1.2em;
 }
 
-.auth-section {
-  background-color: #f9f9f9;
-  border-radius: 8px;
+.form-container {
+  max-width: 400px;
+  margin: 30px auto;
   padding: 20px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  margin-bottom: 30px; /* Może być mniejszy margines, bo nie ma już sekcji danych */
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }
 
-.tab-buttons {
+.form-toggle {
   display: flex;
   justify-content: center;
   margin-bottom: 20px;
+  background-color: #eee;
+  border-radius: 8px;
+  padding: 5px;
 }
 
-.tab-buttons button {
-  background-color: #eee;
+.toggle-button {
+  flex: 1;
+  padding: 10px;
   border: none;
-  padding: 10px 20px;
+  background-color: transparent;
   cursor: pointer;
   font-size: 1em;
-  border-radius: 5px;
-  margin: 0 5px;
-  transition: background-color 0.3s ease;
+  color: #555;
+  border-radius: 6px;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-.tab-buttons button.active {
+.toggle-button.active {
   background-color: #42b983;
   color: white;
   font-weight: bold;
 }
 
-.auth-form h2 {
-  color: #2c3e50;
+.auth-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.auth-form h3 {
   margin-bottom: 20px;
+  color: #333;
+}
+
+.auth-form .form-group {
+  margin-bottom: 15px;
+  text-align: left;
 }
 
 .auth-form input {
-  width: calc(100% - 20px);
-  padding: 10px;
-  margin-bottom: 15px;
+  padding: 12px;
   border: 1px solid #ddd;
   border-radius: 5px;
   font-size: 1em;
+  width: 100%;
+  box-sizing: border-box;
+}
+.auth-form input:not([type="submit"]) {
+  margin-bottom: 5px;
 }
 
-.auth-form button {
-  background-color: #42b983;
+.auth-form button[type="submit"] {
+  padding: 12px;
+  background-color: #007bff;
   color: white;
   border: none;
-  padding: 12px 25px;
   border-radius: 5px;
   cursor: pointer;
   font-size: 1.1em;
-  transition: background-color 0.3s ease;
+  margin-top: 10px;
+  transition: background-color 0.3s;
+  min-height: 48px;
+}
+.auth-form button[type="submit"]:disabled {
+  background-color: #0056b3;
 }
 
-.auth-form button:hover {
-  background-color: #368a65;
+.auth-form button[type="submit"]:hover {
+  background-color: #0056b3;
+}
+
+.error-message {
+  color: #dc3545;
+  margin-top: 15px;
+}
+
+.validation-error {
+  color: #dc3545;
+  font-size: 0.8em;
+  margin: 0;
+  padding-left: 5px;
 }
 </style>
