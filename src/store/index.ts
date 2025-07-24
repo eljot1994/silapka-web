@@ -1,3 +1,4 @@
+// src/store/index.ts
 import { createStore } from "vuex";
 import { auth, db } from "@/firebase";
 import {
@@ -374,20 +375,24 @@ const store = createStore<State>({
           name: exerciseType.name,
           category: exerciseType.category,
           done: false,
-          sets:
-            exerciseType.category === "strength"
-              ? exerciseType.lastUsedSets?.map((s: SessionSet) => ({
-                  ...s,
-                  id: uuidv4(),
-                  done: false,
-                })) || [{ id: uuidv4(), weight: null, reps: null, done: false }]
-              : undefined,
-          duration: exerciseType.lastUsedDuration || null,
-          reps: exerciseType.lastUsedReps || null,
         };
 
-        if (newExercise.category !== "strength") {
-          delete newExercise.sets;
+        // Zmodyfikowana logika inicjalizacji właściwości
+        if (exerciseType.category === "strength") {
+          newExercise.sets = exerciseType.lastUsedSets?.map(
+            (s: SessionSet) => ({
+              ...s,
+              id: uuidv4(),
+              done: false,
+            })
+          ) || [{ id: uuidv4(), weight: null, reps: null, done: false }];
+        } else if (exerciseType.category === "cardio") {
+          newExercise.duration = exerciseType.lastUsedDuration ?? 0;
+        } else if (exerciseType.category === "flexibility") {
+          newExercise.reps = exerciseType.lastUsedReps ?? 0;
+          newExercise.duration = exerciseType.lastUsedDuration ?? 0;
+        } else if (exerciseType.category === "recovery") {
+          newExercise.duration = exerciseType.lastUsedDuration ?? 0;
         }
 
         const userRef = doc(db, "users", state.currentUser.uid);
