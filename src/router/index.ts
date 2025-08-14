@@ -2,11 +2,14 @@ import { createRouter, createWebHistory, RouteRecordRaw } from "vue-router";
 import HomeView from "../views/HomeView.vue";
 import WelcomeView from "../views/WelcomeView.vue";
 import AddExerciseView from "../views/AddExerciseView.vue";
-import FinishTrainingView from "../views/FinishTrainingView.vue";
-import HistoryView from "../views/HistoryView.vue";
 import ExerciseTypesView from "../views/ExerciseTypesView.vue";
+import HistoryView from "../views/HistoryView.vue";
+import FinishTrainingView from "../views/FinishTrainingView.vue";
+import TemplatesView from "../views/TemplatesView.vue";
 import StatsView from "../views/StatsView.vue";
-import TemplatesView from "../views/TemplatesView.vue"; // NOWY IMPORT
+// NOWE IMPORTY
+import ProfileView from "../views/ProfileView.vue";
+import ProfileSettingsView from "../views/ProfileSettingsView.vue";
 import store from "../store";
 
 const routes: Array<RouteRecordRaw> = [
@@ -26,86 +29,56 @@ const routes: Array<RouteRecordRaw> = [
     path: "/welcome",
     name: "welcome",
     component: WelcomeView,
-    beforeEnter: (to, from, next) => {
-      if (store.getters.isAuthenticated) {
-        next();
-      } else {
-        next({ name: "home" });
-      }
-    },
+    meta: { requiresAuth: true },
   },
   {
     path: "/add-exercise",
     name: "add-exercise",
     component: AddExerciseView,
-    beforeEnter: (to, from, next) => {
-      if (store.getters.isAuthenticated) {
-        next();
-      } else {
-        next({ name: "home" });
-      }
-    },
-  },
-  {
-    path: "/finish-training",
-    name: "finish-training",
-    component: FinishTrainingView,
-    beforeEnter: (to, from, next) => {
-      if (store.getters.isAuthenticated) {
-        next();
-      } else {
-        next({ name: "home" });
-      }
-    },
-  },
-  {
-    path: "/history",
-    name: "history",
-    component: HistoryView,
-    beforeEnter: (to, from, next) => {
-      if (store.getters.isAuthenticated) {
-        next();
-      } else {
-        next({ name: "home" });
-      }
-    },
+    meta: { requiresAuth: true },
   },
   {
     path: "/exercise-types",
     name: "exercise-types",
     component: ExerciseTypesView,
-    beforeEnter: (to, from, next) => {
-      if (store.getters.isAuthenticated) {
-        next();
-      } else {
-        next({ name: "home" });
-      }
-    },
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/history",
+    name: "history",
+    component: HistoryView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/finish-training",
+    name: "finish-training",
+    component: FinishTrainingView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/templates",
+    name: "templates",
+    component: TemplatesView,
+    meta: { requiresAuth: true },
   },
   {
     path: "/stats",
     name: "stats",
     component: StatsView,
-    beforeEnter: (to, from, next) => {
-      if (store.getters.isAuthenticated) {
-        next();
-      } else {
-        next({ name: "home" });
-      }
-    },
+    meta: { requiresAuth: true },
+  },
+  // NOWE ŚCIEŻKI
+  {
+    path: "/profile",
+    name: "profile",
+    component: ProfileView,
+    meta: { requiresAuth: true },
   },
   {
-    // NOWA TRASA
-    path: "/templates",
-    name: "templates",
-    component: TemplatesView,
-    beforeEnter: (to, from, next) => {
-      if (store.getters.isAuthenticated) {
-        next();
-      } else {
-        next({ name: "home" });
-      }
-    },
+    path: "/settings",
+    name: "settings",
+    component: ProfileSettingsView,
+    meta: { requiresAuth: true },
   },
 ];
 
@@ -114,13 +87,13 @@ const router = createRouter({
   routes,
 });
 
-// Ta funkcja jest ważna, ale może powodować problemy przy odświeżaniu,
-// jeśli nie ma `initializeAuth`. Na razie ją zostawiamy.
-router.beforeEach(async (to, from, next) => {
-  if (!store.state.currentUser && localStorage.getItem("currentUser")) {
-    // Zakładamy, że `onAuthStateChanged` w main.ts obsłuży logowanie
+router.beforeEach((to, from, next) => {
+  const requiresAuth = to.matched.some((record) => record.meta.requiresAuth);
+  if (requiresAuth && !store.getters.isAuthenticated) {
+    next({ name: "home" });
+  } else {
+    next();
   }
-  next();
 });
 
 export default router;

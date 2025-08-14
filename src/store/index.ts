@@ -1,4 +1,3 @@
-// src/store/index.ts
 import { createStore } from "vuex";
 import { auth, db } from "@/firebase";
 import {
@@ -83,6 +82,10 @@ export interface LastTrainedParties {
   [party: string]: number;
 }
 
+interface UserSettings {
+  restDuration: number;
+}
+
 interface State {
   currentUser: User | null;
   authIsReady: boolean;
@@ -99,9 +102,9 @@ interface State {
   isTrainingPaused: boolean;
   trainingTime: string;
   trainingTimerInterval: number | null;
+  userSettings: UserSettings;
 }
 
-// Funkcja pomocnicza do rekurencyjnego usuwania pól o wartości undefined
 function removeUndefined(obj: any): any {
   if (Array.isArray(obj)) {
     return obj.map((item) => removeUndefined(item));
@@ -137,6 +140,9 @@ const store = createStore<State>({
     isTrainingPaused: false,
     trainingTime: "00:00:00",
     trainingTimerInterval: null,
+    userSettings: {
+      restDuration: 120,
+    },
   },
 
   getters: {
@@ -155,6 +161,7 @@ const store = createStore<State>({
     restTimerSeconds: (state) => state.restTimerSeconds,
     isTrainingPaused: (state) => state.isTrainingPaused,
     trainingTime: (state) => state.trainingTime,
+    userSettings: (state) => state.userSettings,
   },
 
   mutations: {
@@ -207,20 +214,6 @@ const store = createStore<State>({
       const exercise = state.currentTraining.find((ex) => ex.id === exerciseId);
       if (exercise && exercise.sets) {
         exercise.sets.push(newSet);
-      }
-    },
-    UPDATE_SET(
-      state,
-      { exerciseId, updatedSet }: { exerciseId: string; updatedSet: Set }
-    ) {
-      const exercise = state.currentTraining.find((ex) => ex.id === exerciseId);
-      if (exercise && exercise.sets) {
-        const setIndex = exercise.sets.findIndex(
-          (set: Set) => set.id === updatedSet.id
-        );
-        if (setIndex !== -1) {
-          exercise.sets[setIndex] = updatedSet;
-        }
       }
     },
     REMOVE_SET(
@@ -300,12 +293,16 @@ const store = createStore<State>({
         state.trainingTimerInterval = null;
       }
     },
+    SET_USER_SETTINGS(state, settings: UserSettings) {
+      state.userSettings = settings;
+    },
   },
 
   actions: {
-    startRestTimer({ commit, dispatch, state }, duration = 60) {
+    startRestTimer({ commit, dispatch, state }, duration?: number) {
+      const restTime = duration ?? state.userSettings.restDuration;
       dispatch("stopRestTimer");
-      commit("SET_REST_TIMER_SECONDS", duration);
+      commit("SET_REST_TIMER_SECONDS", restTime);
       commit("SET_REST_TIMER_ACTIVE", true);
 
       const interval = setInterval(() => {
@@ -369,6 +366,7 @@ const store = createStore<State>({
           trainingHistory: [],
           trainingTemplates: [],
           lastTrainedParties: {},
+          userSettings: { restDuration: 120 },
         });
         await setDoc(userRef, userData);
         commit("SET_USER", { uid: res.user.uid, email: res.user.email });
@@ -395,6 +393,7 @@ const store = createStore<State>({
       commit("SET_TRAINING_TEMPLATES", []);
       commit("SET_TRAINING_ACTIVE", false);
       commit("SET_LAST_TRAINED_PARTIES", {});
+      commit("SET_USER_SETTINGS", { restDuration: 120 });
     },
     async fetchUserData({ commit, state }) {
       if (state.currentUser) {
@@ -407,7 +406,20 @@ const store = createStore<State>({
           commit("SET_TRAINING_HISTORY", data.trainingHistory || []);
           commit("SET_TRAINING_TEMPLATES", data.trainingTemplates || []);
           commit("SET_LAST_TRAINED_PARTIES", data.lastTrainedParties || {});
+          commit(
+            "SET_USER_SETTINGS",
+            data.userSettings || { restDuration: 120 }
+          );
         }
+      }
+    },
+    async updateUserSettings({ commit, state }, newSettings: UserSettings) {
+      if (state.currentUser) {
+        const userRef = doc(db, "users", state.currentUser.uid);
+        await updateDoc(userRef, {
+          userSettings: newSettings,
+        });
+        commit("SET_USER_SETTINGS", newSettings);
       }
     },
     async addExerciseType({ commit, state }, type: Omit<ExerciseType, "id">) {
@@ -474,20 +486,13 @@ const store = createStore<State>({
               done: false,
             })
           ) || [{ id: uuidv4(), weight: null, reps: null, done: false }];
-          delete newExercise.duration;
-          delete newExercise.reps;
         } else if (exerciseType.category === "cardio") {
           newExercise.duration = exerciseType.lastUsedDuration ?? 0;
-          delete newExercise.sets;
-          delete newExercise.reps;
         } else if (exerciseType.category === "flexibility") {
           newExercise.reps = exerciseType.lastUsedReps ?? 0;
           newExercise.duration = exerciseType.lastUsedDuration ?? 0;
-          delete newExercise.sets;
         } else if (exerciseType.category === "recovery") {
           newExercise.duration = exerciseType.lastUsedDuration ?? 0;
-          delete newExercise.sets;
-          delete newExercise.reps;
         }
 
         const userRef = doc(db, "users", state.currentUser.uid);
@@ -514,7 +519,7 @@ const store = createStore<State>({
           currentTrainingCopy[index] = updatedExercise;
           const cleanedCurrentTraining = removeUndefined(currentTrainingCopy);
           await updateDoc(userRef, { currentTraining: cleanedCurrentTraining });
-          commit("UPDATE_EXERCISE_IN_PLAN", updatedExercise);
+          commit("SET_CURRENT_TRAINING", currentTrainingCopy);
         }
       }
     },
@@ -569,22 +574,32 @@ const store = createStore<State>({
         const currentTrainingCopy = JSON.parse(
           JSON.stringify(state.currentTraining)
         );
-        const exercise = currentTrainingCopy.find(
+        const exerciseIndex = currentTrainingCopy.findIndex(
           (ex: PlannedExercise) => ex.id === exerciseId
         );
-        if (exercise && exercise.sets) {
-          const setIndex = exercise.sets.findIndex(
-            (set: Set) => set.id === updatedSet.id
-          );
-          if (setIndex !== -1) {
-            exercise.sets[setIndex] = updatedSet;
+
+        if (exerciseIndex > -1) {
+          const exercise = currentTrainingCopy[exerciseIndex];
+          if (exercise.sets) {
+            const setIndex = exercise.sets.findIndex(
+              (set: Set) => set.id === updatedSet.id
+            );
+            if (setIndex > -1) {
+              exercise.sets[setIndex] = updatedSet;
+
+              const allSetsDone = exercise.sets.every((s: Set) => s.done);
+              if (exercise.done !== allSetsDone) {
+                exercise.done = allSetsDone;
+              }
+            }
+
+            const userRef = doc(db, "users", state.currentUser.uid);
+            const cleanedCurrentTraining = removeUndefined(currentTrainingCopy);
+            await updateDoc(userRef, {
+              currentTraining: cleanedCurrentTraining,
+            });
+            commit("SET_CURRENT_TRAINING", currentTrainingCopy);
           }
-          const userRef = doc(db, "users", state.currentUser.uid);
-          const cleanedCurrentTraining = removeUndefined(currentTrainingCopy);
-          await updateDoc(userRef, {
-            currentTraining: cleanedCurrentTraining,
-          });
-          commit("UPDATE_SET", { exerciseId, updatedSet });
         }
       }
     },
@@ -598,12 +613,18 @@ const store = createStore<State>({
         );
         if (exercise && exercise.sets) {
           exercise.sets = exercise.sets.filter((set: Set) => set.id !== setId);
+
+          const allSetsDone = exercise.sets.every((s: Set) => s.done);
+          if (exercise.done !== allSetsDone) {
+            exercise.done = allSetsDone;
+          }
+
           const userRef = doc(db, "users", state.currentUser.uid);
           const cleanedCurrentTraining = removeUndefined(currentTrainingCopy);
           await updateDoc(userRef, {
             currentTraining: cleanedCurrentTraining,
           });
-          commit("REMOVE_SET", { exerciseId, setId });
+          commit("SET_CURRENT_TRAINING", currentTrainingCopy);
         }
       }
     },
@@ -743,7 +764,7 @@ const store = createStore<State>({
             (ex: PlannedExercise) => {
               const newEx = { ...ex, id: uuidv4(), done: false };
               if (newEx.sets) {
-                newEx.sets = newEx.sets.map((s) => ({
+                newEx.sets = newEx.sets.map((s: Set) => ({
                   ...s,
                   id: uuidv4(),
                   done: false,

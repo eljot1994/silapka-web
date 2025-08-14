@@ -1,5 +1,8 @@
 <template>
   <div class="view-container">
+    <button @click="goBackToProfile" class="back-button">
+      &larr; Wróć do profilu
+    </button>
     <h1>Twoje Statystyki Treningowe</h1>
 
     <div class="stats-section">
@@ -48,7 +51,7 @@
 import { defineComponent, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { TrainingRecord, PlannedExercise } from "@/store";
+import { TrainingRecord } from "@/store";
 import { Bar, Line } from "vue-chartjs";
 import {
   Chart as ChartJS,
@@ -81,6 +84,9 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
+    const router = useRouter();
+
+    const goBackToProfile = () => router.push({ name: "profile" });
 
     const allTrainingHistory = computed<TrainingRecord[]>(
       () => store.getters.allTrainingHistory
@@ -90,8 +96,6 @@ export default defineComponent({
       let totalTrainings = allTrainingHistory.value.length;
       let totalCompletedSets = 0;
       let totalCardioDuration = 0;
-      let totalFlexibilityDuration = 0;
-      let totalRecoveryDuration = 0;
 
       allTrainingHistory.value.forEach((training) => {
         training.exercises.forEach((exercise) => {
@@ -103,10 +107,6 @@ export default defineComponent({
             });
           } else if (exercise.category === "cardio" && exercise.done) {
             totalCardioDuration += exercise.duration || 0;
-          } else if (exercise.category === "flexibility" && exercise.done) {
-            totalFlexibilityDuration += exercise.duration || 0;
-          } else if (exercise.category === "recovery" && exercise.done) {
-            totalRecoveryDuration += exercise.duration || 0;
           }
         });
       });
@@ -115,8 +115,6 @@ export default defineComponent({
         totalTrainings,
         totalCompletedSets,
         totalCardioDuration,
-        totalFlexibilityDuration,
-        totalRecoveryDuration,
       };
     });
 
@@ -209,6 +207,7 @@ export default defineComponent({
       allTrainingHistory,
       chartData,
       chartOptions,
+      goBackToProfile,
     };
   },
 });
@@ -220,6 +219,17 @@ export default defineComponent({
   text-align: center;
   max-width: 600px;
   margin: 0 auto;
+  position: relative;
+}
+.back-button {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  background: none;
+  border: none;
+  font-weight: bold;
+  cursor: pointer;
+  color: #007bff;
 }
 h1 {
   color: #2c3e50;

@@ -5,14 +5,10 @@ import router from "./router";
 import store from "./store";
 import { auth } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
-
-// 1. Zaktualizuj import, dodając POSITION
 import Toast, { PluginOptions, POSITION } from "vue-toastification";
 import "vue-toastification/dist/index.css";
 
-// Opcje konfiguracyjne dla powiadomień
 const options: PluginOptions = {
-  // 2. Użyj POSITION.TOP_RIGHT zamiast tekstu
   position: POSITION.TOP_RIGHT,
   timeout: 3000,
   closeOnClick: true,
@@ -26,35 +22,24 @@ const options: PluginOptions = {
   icon: true,
   rtl: false,
 };
-// --- POCZĄTEK ZMIAN ---
 
-// 1. Utwórz aplikację od razu
-const app = createApp(App).use(store).use(router).use(Toast, options);
+let app: any; // Zmienna do przechowywania instancji aplikacji
 
-// 2. Przenieś logikę z onAuthStateChanged do osobnej funkcji
-const initializeAuth = () => {
-  onAuthStateChanged(auth, async (user) => {
-    if (store.state.currentUser === null && user) {
+// onAuthStateChanged to centralny punkt zarządzania autoryzacją.
+// Uruchamia się raz przy starcie aplikacji oraz za każdym razem, gdy użytkownik się loguje lub wylogowuje.
+onAuthStateChanged(auth, async (user) => {
+  // Inicjalizuj i zamontuj aplikację tylko raz - przy pierwszym uruchomieniu onAuthStateChanged.
+  if (!app) {
+    if (user) {
+      // Jeśli przy starcie jest zalogowany użytkownik, zaktualizuj store PRZED utworzeniem aplikacji
       store.commit("SET_USER", { uid: user.uid, email: user.email });
-      if (!store.state.authIsReady) {
-        // Zapobiegaj wielokrotnemu pobieraniu danych
-        await store.dispatch("fetchUserData");
-      }
+      await store.dispatch("fetchUserData");
     }
+    // Oznacz, że autoryzacja jest gotowa, aby ukryć ekrany ładowania
+    store.commit("SET_AUTH_IS_READY", true);
 
-    if (!store.state.authIsReady) {
-      store.commit("SET_AUTH_IS_READY", true);
-    }
-
-    // 3. Zamontuj aplikację dopiero po pierwszym sprawdzeniu autoryzacji
-    //    i tylko wtedy, gdy nie została jeszcze zamontowana.
-    if (!app._container) {
-      app.mount("#app");
-    }
-  });
-};
-
-// 4. Wywołaj funkcję inicjalizującą
-initializeAuth();
-
-// --- KONIEC ZMIAN ---
+    // Stwórz i zamontuj aplikację
+    app = createApp(App).use(store).use(router).use(Toast, options);
+    app.mount("#app");
+  }
+});

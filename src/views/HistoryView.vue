@@ -1,5 +1,8 @@
 <template>
   <div class="view-container">
+    <button @click="goBackToProfile" class="back-button">
+      &larr; Wróć do profilu
+    </button>
     <h1>Historia Treningów</h1>
 
     <div class="history-section">
@@ -90,6 +93,9 @@ export default defineComponent({
   name: "HistoryView",
   setup() {
     const store = useStore();
+    const router = useRouter();
+
+    const goBackToProfile = () => router.push({ name: "profile" });
 
     const parseDate = (dateString: string) => {
       const parts = dateString.split(".");
@@ -117,6 +123,7 @@ export default defineComponent({
     return {
       sortedTrainingHistory,
       deleteTraining,
+      goBackToProfile,
     };
   },
 });
@@ -128,6 +135,17 @@ export default defineComponent({
   text-align: center;
   max-width: 600px;
   margin: 0 auto;
+  position: relative;
+}
+.back-button {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  background: none;
+  border: none;
+  font-weight: bold;
+  cursor: pointer;
+  color: #007bff;
 }
 .training-header {
   display: flex;
@@ -135,7 +153,6 @@ export default defineComponent({
   align-items: center;
   margin-bottom: 10px;
 }
-
 .delete-button {
   background-color: #dc3545;
   color: white;
@@ -144,19 +161,16 @@ export default defineComponent({
   border-radius: 5px;
   cursor: pointer;
 }
-
 .training-duration {
   font-size: 0.7em;
   color: #555;
   font-weight: normal;
 }
-
 h1 {
   color: #2c3e50;
   margin-bottom: 30px;
   font-size: 2em;
 }
-
 .history-section {
   background-color: #ffffff;
   padding: 25px;
@@ -164,18 +178,15 @@ h1 {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   text-align: left;
 }
-
 .info-message {
   text-align: center;
   color: #777;
   font-style: italic;
 }
-
 .training-list {
   list-style: none;
   padding: 0;
 }
-
 .training-item {
   background-color: #e8f5e9;
   border: 1px solid #c8e6c9;
@@ -184,13 +195,11 @@ h1 {
   margin-bottom: 20px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
-
 .training-header h4 {
   margin: 0;
   font-size: 1.5em;
   color: #42b983;
 }
-
 .training-date {
   font-weight: normal;
   color: #2c3e50;
@@ -199,31 +208,26 @@ h1 {
   padding: 4px 8px;
   border-radius: 4px;
 }
-
 .exercises-summary {
   font-weight: bold;
   margin-top: 15px;
   margin-bottom: 10px;
 }
-
 .exercise-summary-list {
   list-style: none;
   padding-left: 0;
   border-left: 2px solid #ccc;
   margin-left: 10px;
 }
-
 .exercise-summary-item {
   margin-bottom: 10px;
   padding-left: 10px;
 }
-
 .exercise-name-summary {
   font-weight: bold;
   color: #2c3e50;
   font-size: 1em;
 }
-
 .exercise-details-summary {
   font-size: 0.9em;
   color: #555;

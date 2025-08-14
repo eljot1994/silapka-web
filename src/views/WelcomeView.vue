@@ -14,12 +14,10 @@
     </div>
 
     <div class="training-section">
-      <h3>
-        Aktualny Trening
-        <span v-if="isTrainingActive" class="timer">
-          {{ isTrainingPaused ? "Wstrzymano" : trainingTime }}
-        </span>
-      </h3>
+      <h3>Aktualny Trening</h3>
+      <div v-if="isTrainingActive" class="timer">
+        <span>{{ isTrainingPaused ? "Wstrzymano" : trainingTime }}</span>
+      </div>
 
       <button
         @click="startTraining"
@@ -50,142 +48,197 @@
           class="exercise-card"
           :class="{
             'exercise-done': exercise.done,
-            'active-training': isTrainingActive,
           }"
         >
           <div class="card-header">
             <span class="exercise-name">{{ exercise.name }}</span>
-            <div class="header-actions">
-              <input
-                type="checkbox"
-                class="exercise-checkbox"
-                title="Oznacz całe ćwiczenie jako wykonane"
-                :checked="exercise.done"
-                :disabled="!isTrainingActive || isTrainingPaused"
-                @change="toggleExerciseDone(exercise.id)"
-              />
-              <button
-                @click="removeExercise(exercise.id)"
-                class="icon-button"
-                title="Usuń ćwiczenie z planu"
+            <button
+              @click="removeExercise(exercise.id)"
+              class="icon-button remove-exercise-button"
+              title="Usuń ćwiczenie z planu"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                height="24px"
+                viewBox="0 0 24 24"
+                width="24px"
+                fill="currentColor"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  height="24px"
-                  viewBox="0 0 24 24"
-                  width="24px"
-                  fill="#5f6368"
-                >
-                  <path d="M0 0h24v24H0z" fill="none" />
-                  <path
-                    d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
-                  />
-                </svg>
-              </button>
-            </div>
+                <path d="M0 0h24v24H0z" fill="none" />
+                <path
+                  d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
+                />
+              </svg>
+            </button>
           </div>
 
           <div class="card-content">
             <template v-if="exercise.category === 'strength'">
               <ul class="set-list">
-                <li class="set-header-row">
-                  <span class="set-col">Seria</span>
-                  <span class="set-col">Ciężar (kg)</span>
-                  <span class="set-col">Powt.</span>
-                  <span class="set-col">Stan</span>
-                </li>
                 <li
                   v-for="(set, index) in exercise.sets"
                   :key="set.id"
                   class="set-item"
                   :class="{ 'set-done': set.done }"
                 >
-                  <span class="set-col set-index">{{ index + 1 }}</span>
-                  <input
-                    class="set-col"
-                    type="number"
-                    v-model.number="set.weight"
-                    @input="updateSetInStore(exercise.id, set)"
-                  />
-                  <input
-                    class="set-col"
-                    type="number"
-                    v-model.number="set.reps"
-                    @input="updateSetInStore(exercise.id, set)"
-                  />
-                  <div class="set-col set-actions">
-                    <input
-                      type="checkbox"
-                      class="set-checkbox"
-                      title="Oznacz serię jako wykonaną"
-                      :checked="set.done"
-                      :disabled="!isTrainingActive || isTrainingPaused"
-                      @change="toggleSetDone(exercise.id, set.id)"
-                    />
-                    <button
-                      @click="removeSet(exercise.id, set.id)"
-                      class="icon-button small"
-                      title="Usuń serię"
+                  <button
+                    @click="toggleSetDone(exercise, set.id, index)"
+                    class="set-status-button"
+                    :disabled="
+                      !isTrainingActive ||
+                      isTrainingPaused ||
+                      isSetLocked(exercise.sets, index)
+                    "
+                  >
+                    <span v-if="!set.done" class="set-index">{{
+                      index + 1
+                    }}</span>
+                    <svg
+                      v-else
+                      class="set-check-icon"
+                      xmlns="http://www.w3.org/2000/svg"
+                      height="24px"
+                      viewBox="0 0 24 24"
+                      width="24px"
+                      fill="white"
                     >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        height="20px"
-                        viewBox="0 0 24 24"
-                        width="20px"
-                        fill="#5f6368"
-                      >
-                        <path d="M0 0h24v24H0z" fill="none" />
-                        <path
-                          d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
-                        />
-                      </svg>
-                    </button>
+                      <path d="M0 0h24v24H0z" fill="none" />
+                      <path
+                        d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"
+                      />
+                    </svg>
+                  </button>
+                  <div class="set-inputs">
+                    <div class="input-group">
+                      <label :for="`weight-${set.id}`">Ciężar (kg)</label>
+                      <input
+                        :id="`weight-${set.id}`"
+                        type="number"
+                        v-model.number="set.weight"
+                        @input="updateSetInStore(exercise.id, set)"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div class="input-group">
+                      <label :for="`reps-${set.id}`">Powtórzenia</label>
+                      <input
+                        :id="`reps-${set.id}`"
+                        type="number"
+                        v-model.number="set.reps"
+                        @input="updateSetInStore(exercise.id, set)"
+                        placeholder="0"
+                      />
+                    </div>
                   </div>
+                  <button
+                    @click="removeSet(exercise.id, set.id)"
+                    class="icon-button remove-set-button"
+                    title="Usuń serię"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      height="24px"
+                      viewBox="0 0 24 24"
+                      width="24px"
+                      fill="currentColor"
+                    >
+                      <path d="M0 0h24v24H0V0z" fill="none" />
+                      <path
+                        d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+                      />
+                    </svg>
+                  </button>
                 </li>
               </ul>
               <button @click="addSet(exercise.id)" class="add-set-button">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  height="24px"
-                  viewBox="0 0 24 24"
-                  width="24px"
-                  fill="currentColor"
-                >
-                  <path d="M0 0h24v24H0z" fill="none" />
-                  <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
-                </svg>
-                Dodaj serię
+                + Dodaj serię
               </button>
             </template>
 
             <template v-else>
-              <div class="other-exercise-inputs">
-                <label v-if="exercise.duration !== undefined">
-                  Długość (min):
-                  <input
-                    type="number"
-                    v-model.number="exercise.duration"
-                    @input="updateExerciseInStore(exercise)"
-                  />
-                </label>
-                <label v-if="exercise.reps !== undefined">
-                  Powtórzenia:
-                  <input
-                    type="number"
-                    v-model.number="exercise.reps"
-                    @input="updateExerciseInStore(exercise)"
-                  />
-                </label>
+              <div class="other-exercise-wrapper">
+                <button
+                  @click="toggleExerciseDone(exercise.id)"
+                  class="set-status-button"
+                  :class="{ done: exercise.done }"
+                  :disabled="!isTrainingActive || isTrainingPaused"
+                >
+                  <svg
+                    v-if="exercise.done"
+                    class="set-check-icon"
+                    xmlns="http://www.w3.org/2000/svg"
+                    height="24px"
+                    viewBox="0 0 24 24"
+                    width="24px"
+                    fill="white"
+                  >
+                    <path d="M0 0h24v24H0z" fill="none" />
+                    <path
+                      d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"
+                    />
+                  </svg>
+                </button>
+                <div class="other-exercise-inputs">
+                  <div
+                    class="input-group"
+                    v-if="exercise.duration !== undefined"
+                  >
+                    <label>Długość (min)</label>
+                    <input
+                      type="number"
+                      v-model.number="exercise.duration"
+                      @input="updateExerciseInStore(exercise)"
+                      placeholder="0"
+                    />
+                  </div>
+                  <div class="input-group" v-if="exercise.reps !== undefined">
+                    <label>Powtórzenia</label>
+                    <input
+                      type="number"
+                      v-model.number="exercise.reps"
+                      @input="updateExerciseInStore(exercise)"
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
               </div>
             </template>
           </div>
         </li>
       </ul>
+      <button
+        @click="saveAsTemplate"
+        v-if="currentTraining.length > 0 && !isTrainingActive"
+        class="action-button save-template-button"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          height="24px"
+          viewBox="0 0 24 24"
+          width="24px"
+          fill="currentColor"
+        >
+          <path d="M0 0h24v24H0z" fill="none" />
+          <path
+            d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"
+          />
+        </svg>
+        Zapisz jako szablon
+      </button>
     </div>
 
     <div class="main-actions-bar">
       <button @click="goToAddExercise" class="action-button primary">
-        <span>+</span>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          height="24px"
+          viewBox="0 0 24 24"
+          width="24px"
+          fill="currentColor"
+        >
+          <path d="M0 0h24v24H0z" fill="none" />
+          <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+        </svg>
         Dodaj ćwiczenie
       </button>
 
@@ -283,52 +336,67 @@ export default defineComponent({
       store.dispatch("stopRestTimer");
     });
 
+    const isSetLocked = (sets: Set[] | undefined, index: number) => {
+      if (!sets || index === 0) {
+        return false;
+      }
+      return !sets[index - 1].done;
+    };
+
     const toggleExerciseDone = (exerciseId: string) => {
       if (!isTrainingActive.value || isTrainingPaused.value) return;
       const exercise = currentTraining.value.find((ex) => ex.id === exerciseId);
       if (exercise) {
-        if (
-          exercise.category === "cardio" ||
-          exercise.category === "flexibility" ||
-          exercise.category === "recovery"
-        ) {
-          const updatedExercise = { ...exercise, done: !exercise.done };
-          store.dispatch("updateExerciseInPlan", updatedExercise);
-        } else if (exercise.category === "strength") {
-          const newDoneStatus = !exercise.done;
-          const updatedSets =
+        const newDoneStatus = !exercise.done;
+        const updatedExercise: PlannedExercise = {
+          ...exercise,
+          done: newDoneStatus,
+        };
+        if (exercise.category === "strength") {
+          updatedExercise.sets =
             exercise.sets?.map((s) => ({ ...s, done: newDoneStatus })) || [];
-          const updatedExercise = {
-            ...exercise,
-            done: newDoneStatus,
-            sets: updatedSets,
-          };
-          store.dispatch("updateExerciseInPlan", updatedExercise);
         }
+        store.dispatch("updateExerciseInPlan", updatedExercise);
       }
     };
 
-    const toggleSetDone = (exerciseId: string, setId: string) => {
+    const toggleSetDone = (
+      exercise: PlannedExercise,
+      setId: string,
+      index: number
+    ) => {
       if (!isTrainingActive.value || isTrainingPaused.value) return;
-      const exercise = currentTraining.value.find((ex) => ex.id === exerciseId);
-      if (exercise && exercise.category === "strength" && exercise.sets) {
-        const set = exercise.sets.find((s) => s.id === setId);
-        if (set) {
-          const updatedSet = { ...set, done: !set.done };
-          store.dispatch("updateSet", { exerciseId, updatedSet });
 
-          if (updatedSet.done) {
-            store.dispatch("startRestTimer", 60);
-          }
+      const sets = exercise.sets;
+      if (!sets) return;
 
-          const allSetsDone = exercise.sets.every((s) => s.done);
-          if (exercise.done !== allSetsDone) {
-            store.dispatch("updateExerciseInPlan", {
-              ...exercise,
-              done: allSetsDone,
-            });
-          }
+      const set = sets.find((s) => s.id === setId);
+      if (!set) return;
+
+      // Logika dla ODZNACZANIA
+      if (set.done) {
+        const hasLaterDoneSet = sets.some((s, i) => i > index && s.done);
+        if (hasLaterDoneSet) {
+          toast.warning("Odznacz najpierw ostatnią wykonaną serię.");
+          return;
         }
+      }
+      // Logika dla ZAZNACZANIA
+      else {
+        if (isSetLocked(sets, index)) {
+          toast.warning("Ukończ najpierw poprzednią serię.");
+          return;
+        }
+      }
+
+      const updatedSet = { ...set, done: !set.done };
+      store.dispatch("updateSet", {
+        exerciseId: exercise.id,
+        updatedSet,
+      });
+
+      if (updatedSet.done) {
+        store.dispatch("startRestTimer");
       }
     };
 
@@ -402,6 +470,7 @@ export default defineComponent({
       startTraining,
       pauseTraining,
       resumeTraining,
+      isSetLocked,
       toggleExerciseDone,
       toggleSetDone,
       stopRestTimer,
@@ -421,7 +490,7 @@ export default defineComponent({
 <style scoped>
 /* GENERAL */
 .page-wrapper {
-  padding: 20px 20px 100px 20px;
+  padding: 20px 15px 120px 15px;
   max-width: 600px;
   margin: 0 auto;
 }
@@ -444,16 +513,15 @@ export default defineComponent({
   font-size: 1.5em;
   color: #2c3e50;
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: 10px;
 }
 .timer {
-  font-size: 0.8em;
+  display: block;
+  text-align: center;
+  font-size: 1.2em;
   font-weight: bold;
   color: #007bff;
-  margin-left: 10px;
-  background-color: #e3f2fd;
-  padding: 5px 10px;
-  border-radius: 5px;
+  margin-bottom: 20px;
 }
 
 /* EXERCISE LIST */
@@ -464,130 +532,132 @@ export default defineComponent({
 }
 .exercise-card {
   background-color: #fff;
-  border: 1px solid #e0e0e0;
   border-radius: 12px;
-  margin-bottom: 15px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  margin-bottom: 20px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
   overflow: hidden;
+  border: 1px solid #e8e8e8;
 }
-.exercise-done {
-  border-left: 4px solid #42b983;
+.exercise-done > .card-header {
+  border-left: 5px solid #42b983;
 }
-
-/* CARD HEADER */
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 15px;
-  background-color: #f9f9f9;
-  border-bottom: 1px solid #e0e0e0;
+  padding: 12px 15px;
+  background-color: #f7f9fc;
+  border-left: 5px solid transparent;
 }
 .exercise-name {
   font-weight: bold;
-  font-size: 1.1em;
+  font-size: 1.2em;
 }
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+.remove-exercise-button {
+  color: #888;
 }
-.exercise-checkbox {
-  width: 22px;
-  height: 22px;
-  accent-color: #42b983;
-}
-
-/* CARD CONTENT & SETS */
 .card-content {
   padding: 15px;
 }
+
+/* SET & OTHER EXERCISE STATUS BUTTON */
+.set-status-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid #ccc;
+  background-color: #fff;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+.set-status-button:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.set-status-button.done,
+.set-item.set-done .set-status-button {
+  background-color: #42b983;
+  border-color: #42b983;
+}
+.set-check-icon {
+  fill: white;
+}
+.set-index {
+  font-size: 1.2em;
+  font-weight: bold;
+  color: #333;
+}
+
+/* UKŁAD SERII */
 .set-list {
   list-style: none;
   padding: 0;
-  display: grid;
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
-.set-header-row,
 .set-item {
-  display: grid;
-  grid-template-columns: 0.5fr 1fr 1fr 1fr;
-  gap: 10px;
+  display: flex;
   align-items: center;
-  text-align: center;
+  gap: 15px;
 }
-.set-header-row {
-  font-weight: bold;
+.set-inputs {
+  display: flex;
+  flex-grow: 1;
+  gap: 10px;
+  min-width: 0;
+}
+.input-group {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.input-group label {
   font-size: 0.8em;
   color: #666;
-  padding-bottom: 5px;
-  border-bottom: 1px solid #eee;
+  margin-bottom: 4px;
 }
-.set-col input {
+.input-group input {
   width: 100%;
-  padding: 8px;
-  border: 1px solid #ccc;
+  padding: 10px;
+  border: 1px solid #ddd;
   border-radius: 6px;
   text-align: center;
+  font-size: 1.1em;
 }
-.set-index {
-  font-weight: bold;
+.remove-set-button {
+  color: #e57373;
+  flex-shrink: 0;
 }
-.set-actions {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-.set-checkbox {
-  width: 20px;
-  height: 20px;
-  accent-color: #007bff;
-}
-.set-done {
-  opacity: 0.6;
-}
-.set-done .set-col input {
-  background-color: #f1f3f4;
-}
-
 .add-set-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
+  background: none;
+  border: 2px dashed #ccc;
+  border-radius: 8px;
+  padding: 10px;
   width: 100%;
   margin-top: 15px;
-  padding: 10px;
-  font-size: 0.9em;
-  background-color: #e8eaf6;
-  color: #3f51b5;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
+  color: #666;
   font-weight: bold;
 }
 
-/* OTHER EXERCISES */
+/* UKŁAD POZOSTAŁYCH ĆWICZEŃ */
+.other-exercise-wrapper {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
 .other-exercise-inputs {
+  flex-grow: 1;
   display: flex;
   gap: 15px;
 }
-.other-exercise-inputs label {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  font-size: 0.9em;
-  color: #555;
-}
-.other-exercise-inputs input {
-  margin-top: 5px;
-  padding: 8px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-}
 
-/* ACTION BUTTONS */
+/* PRZYCISKI AKCJI */
 .main-actions-bar {
   display: flex;
   flex-direction: column;
@@ -607,17 +677,11 @@ export default defineComponent({
   align-items: center;
   justify-content: center;
   gap: 8px;
-}
-.action-button span {
-  font-size: 1.5em;
-  line-height: 1;
+  height: 50px;
 }
 .action-button.primary {
   background-color: #42b983;
   color: white;
-}
-.action-button.primary:hover {
-  background-color: #368a65;
 }
 .action-button.secondary {
   background-color: #007bff;
@@ -631,11 +695,28 @@ export default defineComponent({
   background-color: #ffc107;
   color: #212529;
 }
-.full-width-button {
+.full-width-button,
+.save-template-button {
   margin-bottom: 20px;
 }
+.save-template-button {
+  background-color: #6c757d;
+  color: white;
+}
 
-/* HELPERS & GENERIC */
+/* INNE */
+.no-exercises {
+  text-align: center;
+  padding: 40px 20px;
+  background-color: #f9f9f9;
+  border-radius: 12px;
+  margin-top: 20px;
+}
+.no-exercises p {
+  margin: 0;
+  color: #777;
+  font-style: italic;
+}
 .icon-button {
   background: none;
   border: none;
@@ -643,37 +724,13 @@ export default defineComponent({
   padding: 4px;
   border-radius: 50%;
   display: flex;
-  align-items: center;
-  justify-content: center;
 }
-.icon-button:hover {
-  background-color: #e0e0e0;
-}
-.icon-button.small svg {
-  width: 20px;
-  height: 20px;
-}
-
-.no-exercises {
-  text-align: center;
-  padding: 40px 20px;
-  background-color: #f9f9f9;
-  border-radius: 12px;
-}
-.no-exercises p {
-  margin: 0;
-  color: #777;
-  font-style: italic;
-}
-
-/* SPINNER & LOADING */
 .loading-container {
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   height: 80vh;
-  color: #555;
 }
 .loading-container .spinner {
   width: 50px;
@@ -692,7 +749,6 @@ export default defineComponent({
     transform: rotate(360deg);
   }
 }
-
 .rest-timer-overlay {
   position: fixed;
   bottom: 80px;
@@ -707,7 +763,7 @@ export default defineComponent({
   justify-content: center;
   align-items: center;
   font-size: 1.2em;
-  z-index: 1000;
+  z-index: 2000;
   gap: 20px;
   border-radius: 12px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);

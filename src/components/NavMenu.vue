@@ -32,21 +32,6 @@
       </svg>
       <span>Główna</span>
     </button>
-    <button @click="goToHistory" class="nav-button" title="Historia">
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        height="24px"
-        viewBox="0 0 24 24"
-        width="24px"
-        fill="currentColor"
-      >
-        <path d="M0 0h24v24H0z" fill="none" />
-        <path
-          d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"
-        />
-      </svg>
-      <span>Historia</span>
-    </button>
     <button @click="goToExerciseTypes" class="nav-button" title="Typy ćwiczeń">
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -62,7 +47,7 @@
       </svg>
       <span>Ćwiczenia</span>
     </button>
-    <button @click="goToTemplates" class="nav-button" title="Szablony">
+    <button @click="goToProfile" class="nav-button" title="Profil">
       <svg
         xmlns="http://www.w3.org/2000/svg"
         height="24px"
@@ -72,25 +57,10 @@
       >
         <path d="M0 0h24v24H0z" fill="none" />
         <path
-          d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V6h5.17l2 2H20v10z"
+          d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"
         />
       </svg>
-      <span>Szablony</span>
-    </button>
-    <button @click="goToStats" class="nav-button" title="Statystyki">
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        height="24px"
-        viewBox="0 0 24 24"
-        width="24px"
-        fill="currentColor"
-      >
-        <path d="M0 0h24v24H0z" fill="none" />
-        <path
-          d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"
-        />
-      </svg>
-      <span>Statystyki</span>
+      <span>Profil</span>
     </button>
   </nav>
 </template>
@@ -107,10 +77,8 @@ export default defineComponent({
     const store = useStore();
 
     const goToWelcome = () => router.push({ name: "welcome" });
-    const goToHistory = () => router.push({ name: "history" });
     const goToExerciseTypes = () => router.push({ name: "exercise-types" });
-    const goToTemplates = () => router.push({ name: "templates" });
-    const goToStats = () => router.push({ name: "stats" });
+    const goToProfile = () => router.push({ name: "profile" });
 
     const handleLogout = async () => {
       await store.dispatch("logout");
@@ -119,10 +87,8 @@ export default defineComponent({
 
     return {
       goToWelcome,
-      goToHistory,
       goToExerciseTypes,
-      goToTemplates,
-      goToStats,
+      goToProfile,
       handleLogout,
     };
   },
@@ -152,14 +118,15 @@ export default defineComponent({
   color: #5f6368;
   font-size: 0.75em;
   gap: 4px;
+  flex: 1;
 }
 .nav-button svg {
   fill: #5f6368;
 }
 .logout-button {
-  color: #dc3545; /* Czerwony kolor tekstu */
+  color: #dc3545;
 }
 .logout-button svg {
-  fill: #dc3545; /* Czerwony kolor ikony */
+  fill: #dc3545;
 }
 </style>
