@@ -283,9 +283,7 @@
 </template>
 
 <script lang="ts">
-// SEKCJA <script> POZOSTAJE BEZ ZMIAN W STOSUNKU DO POPRZEDNIEJ WERSJI
-// Skopiuj ją z poprzedniej odpowiedzi, aby mieć pewność, że jest aktualna.
-import { defineComponent, computed, ref, onUnmounted } from "vue";
+import { defineComponent, computed, ref, onMounted, onUnmounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { PlannedExercise, Set } from "@/store";
@@ -313,32 +311,60 @@ export default defineComponent({
     const isRestTimerActive = computed(() => store.getters.isRestTimerActive);
     const restTimerSeconds = computed(() => store.getters.restTimerSeconds);
 
-    const startTraining = () => {
-      store.commit("SET_TRAINING_ACTIVE", true);
-      timerInterval = window.setInterval(() => {
-        const startTime = store.state.trainingStartTime;
-        if (startTime) {
-          const diff = Math.floor((Date.now() - startTime) / 1000);
-          const h = Math.floor(diff / 3600)
-            .toString()
-            .padStart(2, "0");
-          const m = Math.floor((diff % 3600) / 60)
-            .toString()
-            .padStart(2, "0");
-          const s = (diff % 60).toString().padStart(2, "0");
-          trainingTime.value = `${h}:${m}:${s}`;
-        }
-      }, 1000);
+    // Funkcja do aktualizacji wyświetlanego czasu treningu
+    const updateTrainingTime = () => {
+      const startTime = store.state.trainingStartTime;
+      if (startTime) {
+        const diff = Math.floor((Date.now() - startTime) / 1000);
+        const h = Math.floor(diff / 3600)
+          .toString()
+          .padStart(2, "0");
+        const m = Math.floor((diff % 3600) / 60)
+          .toString()
+          .padStart(2, "0");
+        const s = (diff % 60).toString().padStart(2, "0");
+        trainingTime.value = `${h}:${m}:${s}`;
+      } else {
+        trainingTime.value = "00:00:00"; // Reset jeśli czas startu jest null
+      }
     };
 
-    onUnmounted(() => {
-      if (timerInterval) {
-        clearInterval(timerInterval);
+    const startTraining = () => {
+      // Jeśli trening już jest aktywny, nie rób nic
+      if (store.getters.isTrainingActive) {
+        return;
       }
+      store.commit("SET_TRAINING_ACTIVE", true);
+      // Uruchomienie interwału i jego przechowywanie
+      timerInterval = window.setInterval(updateTrainingTime, 1000);
+    };
+
+    // Po zamontowaniu komponentu, sprawdź, czy trening jest aktywny i uruchom timer
+    onMounted(() => {
+      if (store.getters.isTrainingActive && !timerInterval) {
+        timerInterval = window.setInterval(updateTrainingTime, 1000);
+      }
+      // Natychmiastowa aktualizacja czasu po wejściu do widoku
+      updateTrainingTime();
+    });
+
+    onUnmounted(() => {
+      // Czyść interwał tylko jeśli trening NIE JEST aktywny
+      // Jeśli trening jest aktywny, pozwól mu działać w tle
+      if (!store.getters.isTrainingActive && timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = undefined;
+      }
+      // Stop rest timer zawsze, bo to jest powiązane z widokiem
       store.dispatch("stopRestTimer");
     });
 
     const handleLogout = () => {
+      // Upewnij się, że timer jest zatrzymany przy wylogowaniu
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = undefined;
+      }
       store.dispatch("logout");
       router.push({ name: "home" });
     };
@@ -425,6 +451,11 @@ export default defineComponent({
       try {
         await store.dispatch("finishCurrentTraining");
         toast.success("Trening zakończony i zapisany!");
+        // Upewnij się, że timer jest zatrzymany po zakończeniu treningu
+        if (timerInterval) {
+          clearInterval(timerInterval);
+          timerInterval = undefined;
+        }
         router.push({ name: "history" });
       } catch (error: any) {
         toast.error(

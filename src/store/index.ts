@@ -98,6 +98,29 @@ interface State {
   restTimerInterval: number | null;
 }
 
+// Funkcja pomocnicza do rekurencyjnego usuwania pól o wartości undefined
+function removeUndefined(obj: any): any {
+  // Ostrzeżenie any: tutaj celowo używamy any dla ogólnej funkcji pomocniczej
+  if (Array.isArray(obj)) {
+    // Rekurencyjnie oczyść każdy element tablicy
+    return obj.map((item) => removeUndefined(item));
+  }
+  if (typeof obj === "object" && obj !== null) {
+    const newObj: { [key: string]: any } = {}; // Ostrzeżenie any: tutaj celowo używamy any
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        // Dodaj pole tylko jeśli jego wartość nie jest undefined
+        if (obj[key] !== undefined) {
+          newObj[key] = removeUndefined(obj[key]); // Rekurencyjnie oczyść zagnieżdżone obiekty/tablice
+        }
+      }
+    }
+    return newObj;
+  }
+  // Zwróć niezmienioną wartość dla typów prostych
+  return obj;
+}
+
 const store = createStore<State>({
   state: {
     currentUser: null,
@@ -188,8 +211,9 @@ const store = createStore<State>({
     ) {
       const exercise = state.currentTraining.find((ex) => ex.id === exerciseId);
       if (exercise && exercise.sets) {
+        // Poprawka: jawne typowanie parametru 'set'
         const setIndex = exercise.sets.findIndex(
-          (set) => set.id === updatedSet.id
+          (set: Set) => set.id === updatedSet.id
         );
         if (setIndex !== -1) {
           exercise.sets[setIndex] = updatedSet;
@@ -202,7 +226,8 @@ const store = createStore<State>({
     ) {
       const exercise = state.currentTraining.find((ex) => ex.id === exerciseId);
       if (exercise && exercise.sets) {
-        exercise.sets = exercise.sets.filter((set) => set.id !== setId);
+        // Poprawka: jawne typowanie parametru 'set'
+        exercise.sets = exercise.sets.filter((set: Set) => set.id !== setId);
       }
     },
     SET_TRAINING_HISTORY(state, history: TrainingRecord[]) {
@@ -222,9 +247,12 @@ const store = createStore<State>({
     SET_TRAINING_ACTIVE(state, status: boolean) {
       state.isTrainingActive = status;
       if (status) {
-        state.trainingStartTime = Date.now();
+        // Ustaw trainingStartTime TYLKO JEŚLI JEST JUŻ NULL (tj. trening nie był aktywny)
+        if (state.trainingStartTime === null) {
+          state.trainingStartTime = Date.now();
+        }
       } else {
-        state.trainingStartTime = null;
+        state.trainingStartTime = null; // Zawsze resetuj po zakończeniu
       }
     },
     SET_TRAINING_TEMPLATES(state, templates: TrainingTemplate[]) {
@@ -270,7 +298,7 @@ const store = createStore<State>({
           dispatch("stopRestTimer");
         }
       }, 1000);
-      commit("SET_REST_TIMER_INTERVAL", interval as any);
+      commit("SET_REST_TIMER_INTERVAL", interval as any); // Ostrzeżenie any: Celowe rzutowanie dla zgodności typu
     },
     stopRestTimer({ commit }) {
       commit("CLEAR_REST_TIMER_INTERVAL");
@@ -280,7 +308,8 @@ const store = createStore<State>({
       const res = await createUserWithEmailAndPassword(auth, email, password);
       if (res.user) {
         const userRef = doc(db, "users", res.user.uid);
-        await setDoc(userRef, {
+        // Użyj removeUndefined, aby upewnić się, że początkowe dane są czyste
+        const userData = removeUndefined({
           email: res.user.email,
           exerciseTypes: [],
           currentTraining: [],
@@ -288,6 +317,7 @@ const store = createStore<State>({
           trainingTemplates: [],
           lastTrainedParties: {},
         });
+        await setDoc(userRef, userData);
         commit("SET_USER", { uid: res.user.uid, email: res.user.email });
       } else {
         throw new Error("Could not complete signup");
@@ -333,8 +363,10 @@ const store = createStore<State>({
           parties: type.parties || [],
         };
         const userRef = doc(db, "users", state.currentUser.uid);
+        // Użyj removeUndefined dla obiektu dodawanego do tablicy
+        const cleanedNewType = removeUndefined(newType);
         await updateDoc(userRef, {
-          exerciseTypes: arrayUnion(newType),
+          exerciseTypes: arrayUnion(cleanedNewType),
         });
         commit("ADD_EXERCISE_TYPE", newType);
       }
@@ -342,8 +374,11 @@ const store = createStore<State>({
     async updateExerciseType({ commit, state }, updatedType: ExerciseType) {
       if (state.currentUser) {
         const userRef = doc(db, "users", state.currentUser.uid);
+        // Cała tablica exerciseTypes musi być oczyszczona z undefined przed wysłaniem
         const updatedTypes = state.exerciseTypes.map((t) =>
-          t.id === updatedType.id ? updatedType : t
+          t.id === updatedType.id
+            ? removeUndefined(updatedType)
+            : removeUndefined(t)
         );
         await updateDoc(userRef, { exerciseTypes: updatedTypes });
         commit("UPDATE_EXERCISE_TYPE", updatedType);
@@ -354,8 +389,10 @@ const store = createStore<State>({
         const typeToRemove = state.exerciseTypes.find((t) => t.id === typeId);
         if (typeToRemove) {
           const userRef = doc(db, "users", state.currentUser.uid);
+          // Użyj removeUndefined dla obiektu usuwanego z tablicy
+          const cleanedTypeToRemove = removeUndefined(typeToRemove);
           await updateDoc(userRef, {
-            exerciseTypes: arrayRemove(typeToRemove),
+            exerciseTypes: arrayRemove(cleanedTypeToRemove),
           });
           commit("REMOVE_EXERCISE_TYPE", typeId);
         }
@@ -377,7 +414,6 @@ const store = createStore<State>({
           done: false,
         };
 
-        // Zmodyfikowana logika inicjalizacji właściwości
         if (exerciseType.category === "strength") {
           newExercise.sets = exerciseType.lastUsedSets?.map(
             (s: SessionSet) => ({
@@ -386,18 +422,27 @@ const store = createStore<State>({
               done: false,
             })
           ) || [{ id: uuidv4(), weight: null, reps: null, done: false }];
+          delete newExercise.duration;
+          delete newExercise.reps;
         } else if (exerciseType.category === "cardio") {
           newExercise.duration = exerciseType.lastUsedDuration ?? 0;
+          delete newExercise.sets;
+          delete newExercise.reps;
         } else if (exerciseType.category === "flexibility") {
           newExercise.reps = exerciseType.lastUsedReps ?? 0;
           newExercise.duration = exerciseType.lastUsedDuration ?? 0;
+          delete newExercise.sets;
         } else if (exerciseType.category === "recovery") {
           newExercise.duration = exerciseType.lastUsedDuration ?? 0;
+          delete newExercise.sets;
+          delete newExercise.reps;
         }
 
         const userRef = doc(db, "users", state.currentUser.uid);
+        // Użyj removeUndefined dla obiektu dodawanego do tablicy
+        const cleanedNewExercise = removeUndefined(newExercise);
         await updateDoc(userRef, {
-          currentTraining: arrayUnion(newExercise),
+          currentTraining: arrayUnion(cleanedNewExercise),
         });
         commit("ADD_EXERCISE_TO_PLAN", newExercise);
       }
@@ -408,13 +453,18 @@ const store = createStore<State>({
     ) {
       if (state.currentUser) {
         const userRef = doc(db, "users", state.currentUser.uid);
-        const currentTraining = [...state.currentTraining];
-        const index = currentTraining.findIndex(
-          (ex) => ex.id === updatedExercise.id
+        // Głęboka kopia, aby nie modyfikować bezpośrednio state.currentTraining przed czyszczeniem
+        const currentTrainingCopy = JSON.parse(
+          JSON.stringify(state.currentTraining)
+        );
+        const index = currentTrainingCopy.findIndex(
+          (ex: PlannedExercise) => ex.id === updatedExercise.id
         );
         if (index !== -1) {
-          currentTraining[index] = updatedExercise;
-          await updateDoc(userRef, { currentTraining: currentTraining });
+          currentTrainingCopy[index] = updatedExercise;
+          // Oczyść całą tablicę przed wysłaniem do Firestore
+          const cleanedCurrentTraining = removeUndefined(currentTrainingCopy);
+          await updateDoc(userRef, { currentTraining: cleanedCurrentTraining });
           commit("UPDATE_EXERCISE_IN_PLAN", updatedExercise);
         }
       }
@@ -426,8 +476,10 @@ const store = createStore<State>({
         );
         if (exerciseToRemove) {
           const userRef = doc(db, "users", state.currentUser.uid);
+          // Użyj removeUndefined dla obiektu usuwanego z tablicy
+          const cleanedExerciseToRemove = removeUndefined(exerciseToRemove);
           await updateDoc(userRef, {
-            currentTraining: arrayRemove(exerciseToRemove),
+            currentTraining: arrayRemove(cleanedExerciseToRemove),
           });
           commit("REMOVE_EXERCISE_FROM_PLAN", exerciseId);
         }
@@ -435,15 +487,15 @@ const store = createStore<State>({
     },
     async addSet({ commit, state }, { exerciseId }: { exerciseId: string }) {
       if (state.currentUser) {
-        const currentTraining = JSON.parse(
+        const currentTrainingCopy = JSON.parse(
           JSON.stringify(state.currentTraining)
         );
-        const exerciseIndex = currentTraining.findIndex(
+        const exerciseIndex = currentTrainingCopy.findIndex(
           (ex: PlannedExercise) => ex.id === exerciseId
         );
 
         if (exerciseIndex > -1) {
-          const exercise = currentTraining[exerciseIndex];
+          const exercise = currentTrainingCopy[exerciseIndex];
           if (exercise.sets) {
             const lastSet = exercise.sets[exercise.sets.length - 1];
             const newSet = {
@@ -455,29 +507,37 @@ const store = createStore<State>({
             exercise.sets.push(newSet);
 
             const userRef = doc(db, "users", state.currentUser.uid);
+            // Oczyść całą tablicę przed wysłaniem do Firestore
+            const cleanedCurrentTraining = removeUndefined(currentTrainingCopy);
             await updateDoc(userRef, {
-              currentTraining: currentTraining,
+              currentTraining: cleanedCurrentTraining,
             });
-            commit("SET_CURRENT_TRAINING", currentTraining);
+            commit("SET_CURRENT_TRAINING", currentTrainingCopy);
           }
         }
       }
     },
     async updateSet({ commit, state }, { exerciseId, updatedSet }) {
       if (state.currentUser) {
-        const exercise = state.currentTraining.find(
-          (ex) => ex.id === exerciseId
+        const currentTrainingCopy = JSON.parse(
+          JSON.stringify(state.currentTraining)
+        );
+        const exercise = currentTrainingCopy.find(
+          (ex: PlannedExercise) => ex.id === exerciseId
         );
         if (exercise && exercise.sets) {
-          const updatedSets = exercise.sets.map((set) =>
-            set.id === updatedSet.id ? updatedSet : set
+          // Poprawka: jawne typowanie parametru 'set'
+          const setIndex = exercise.sets.findIndex(
+            (set: Set) => set.id === updatedSet.id
           );
-          const updatedExercise = { ...exercise, sets: updatedSets };
+          if (setIndex !== -1) {
+            exercise.sets[setIndex] = updatedSet;
+          }
           const userRef = doc(db, "users", state.currentUser.uid);
+          // Oczyść całą tablicę przed wysłaniem do Firestore
+          const cleanedCurrentTraining = removeUndefined(currentTrainingCopy);
           await updateDoc(userRef, {
-            currentTraining: state.currentTraining.map((ex) =>
-              ex.id === exerciseId ? updatedExercise : ex
-            ),
+            currentTraining: cleanedCurrentTraining,
           });
           commit("UPDATE_SET", { exerciseId, updatedSet });
         }
@@ -485,17 +545,19 @@ const store = createStore<State>({
     },
     async removeSet({ commit, state }, { exerciseId, setId }) {
       if (state.currentUser) {
-        const exercise = state.currentTraining.find(
-          (ex) => ex.id === exerciseId
+        const currentTrainingCopy = JSON.parse(
+          JSON.stringify(state.currentTraining)
+        );
+        const exercise = currentTrainingCopy.find(
+          (ex: PlannedExercise) => ex.id === exerciseId
         );
         if (exercise && exercise.sets) {
-          const updatedSets = exercise.sets.filter((set) => set.id !== setId);
-          const updatedExercise = { ...exercise, sets: updatedSets };
+          exercise.sets = exercise.sets.filter((set: Set) => set.id !== setId);
           const userRef = doc(db, "users", state.currentUser.uid);
+          // Oczyść całą tablicę przed wysłaniem do Firestore
+          const cleanedCurrentTraining = removeUndefined(currentTrainingCopy);
           await updateDoc(userRef, {
-            currentTraining: state.currentTraining.map((ex) =>
-              ex.id === exerciseId ? updatedExercise : ex
-            ),
+            currentTraining: cleanedCurrentTraining,
           });
           commit("REMOVE_SET", { exerciseId, setId });
         }
@@ -528,8 +590,10 @@ const store = createStore<State>({
         const newLastTrainedParties: LastTrainedParties = {
           ...state.lastTrainedParties,
         };
-        const updatedExerciseTypes = JSON.parse(
-          JSON.stringify(state.exerciseTypes)
+
+        // Zapewnij, że kopia jest oczyszczona z undefined
+        const updatedExerciseTypes = removeUndefined(
+          JSON.parse(JSON.stringify(state.exerciseTypes))
         );
 
         state.currentTraining.forEach((exercise) => {
@@ -543,8 +607,11 @@ const store = createStore<State>({
             if (typeIndex > -1) {
               const updatedType = updatedExerciseTypes[typeIndex];
               updatedType.lastUsedDate = currentDate;
+              // Upewnij się, że sets są kopiowane i czyszczone z id, ale bez undefined
               updatedType.lastUsedSets = exercise.sets
-                ? exercise.sets.map(({ id, ...rest }) => rest)
+                ? exercise.sets.map(({ id: _id, ...rest }) =>
+                    removeUndefined(rest)
+                  ) // Poprawka: zmienna 'id' jest nieużywana, zmieniono na '_id'
                 : undefined;
               updatedType.lastUsedDuration = exercise.duration;
               updatedType.lastUsedReps = exercise.reps;
@@ -562,15 +629,24 @@ const store = createStore<State>({
           id: uuidv4(),
           date: currentDate,
           duration: durationFormatted,
-          exercises: state.currentTraining,
+          // Upewnij się, że exercises w completedTraining są oczyszczone
+          exercises: removeUndefined(state.currentTraining),
         };
 
         const userRef = doc(db, "users", state.currentUser.uid);
+
+        // Użyj removeUndefined dla każdego obiektu danych przed przekazaniem do updateDoc
+        const cleanedCompletedTraining = removeUndefined(completedTraining);
+        const cleanedCurrentTraining = removeUndefined([]);
+        const cleanedLastTrainedParties = removeUndefined(
+          newLastTrainedParties
+        );
+
         await updateDoc(userRef, {
-          trainingHistory: arrayUnion(completedTraining),
-          currentTraining: [],
-          exerciseTypes: updatedExerciseTypes,
-          lastTrainedParties: newLastTrainedParties,
+          trainingHistory: arrayUnion(cleanedCompletedTraining),
+          currentTraining: cleanedCurrentTraining,
+          exerciseTypes: updatedExerciseTypes, // Już oczyszczone wyżej
+          lastTrainedParties: cleanedLastTrainedParties,
         });
 
         commit("ADD_TRAINING_TO_HISTORY", completedTraining);
@@ -587,8 +663,10 @@ const store = createStore<State>({
         );
         if (trainingToRemove) {
           const userRef = doc(db, "users", state.currentUser.uid);
+          // Użyj removeUndefined dla obiektu usuwanego z tablicy
+          const cleanedTrainingToRemove = removeUndefined(trainingToRemove);
           await updateDoc(userRef, {
-            trainingHistory: arrayRemove(trainingToRemove),
+            trainingHistory: arrayRemove(cleanedTrainingToRemove),
           });
           commit("REMOVE_TRAINING_FROM_HISTORY", trainingId);
         }
@@ -602,11 +680,16 @@ const store = createStore<State>({
         const newTemplate: TrainingTemplate = {
           id: uuidv4(),
           name: templateName,
-          exercises: JSON.parse(JSON.stringify(state.currentTraining)),
+          // Upewnij się, że exercises w szablonie są oczyszczone
+          exercises: removeUndefined(
+            JSON.parse(JSON.stringify(state.currentTraining))
+          ),
         };
         const userRef = doc(db, "users", state.currentUser.uid);
+        // Użyj removeUndefined dla obiektu dodawanego do tablicy
+        const cleanedNewTemplate = removeUndefined(newTemplate);
         await updateDoc(userRef, {
-          trainingTemplates: arrayUnion(newTemplate),
+          trainingTemplates: arrayUnion(cleanedNewTemplate),
         });
         commit("ADD_TRAINING_TEMPLATE", newTemplate);
       }
@@ -620,11 +703,31 @@ const store = createStore<State>({
           (t) => t.id === templateId
         );
         if (template) {
+          const exercisesFromTemplate = JSON.parse(
+            JSON.stringify(template.exercises)
+          );
+
+          const preparedExercises = exercisesFromTemplate.map(
+            (ex: PlannedExercise) => {
+              const newEx = { ...ex, id: uuidv4(), done: false };
+              if (newEx.sets) {
+                newEx.sets = newEx.sets.map((s) => ({
+                  ...s,
+                  id: uuidv4(),
+                  done: false,
+                }));
+              }
+              return newEx;
+            }
+          );
+
           const userRef = doc(db, "users", state.currentUser.uid);
+          // Użyj removeUndefined dla całej tablicy przed wysłaniem do Firestore
+          const cleanedPreparedExercises = removeUndefined(preparedExercises);
           await updateDoc(userRef, {
-            currentTraining: template.exercises,
+            currentTraining: cleanedPreparedExercises,
           });
-          commit("SET_CURRENT_TRAINING", template.exercises);
+          commit("SET_CURRENT_TRAINING", preparedExercises);
         }
       }
     },
@@ -635,8 +738,10 @@ const store = createStore<State>({
         );
         if (templateToRemove) {
           const userRef = doc(db, "users", state.currentUser.uid);
+          // Użyj removeUndefined dla obiektu usuwanego z tablicy
+          const cleanedTemplateToRemove = removeUndefined(templateToRemove);
           await updateDoc(userRef, {
-            trainingTemplates: arrayRemove(templateToRemove),
+            trainingTemplates: arrayRemove(cleanedTemplateToRemove),
           });
           commit("REMOVE_TEMPLATE", templateId);
         }
