@@ -1,7 +1,6 @@
 <template>
-  <div class="page-container">
+  <div class="view-container">
     <h1>Twoje Statystyki Treningowe</h1>
-    <button @click="goBack" class="back-button">Wróć</button>
 
     <div class="stats-section">
       <p v-if="allTrainingHistory.length === 0" class="info-message">
@@ -82,7 +81,6 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
-    const router = useRouter();
 
     const allTrainingHistory = computed<TrainingRecord[]>(
       () => store.getters.allTrainingHistory
@@ -122,18 +120,14 @@ export default defineComponent({
       };
     });
 
-    // Obliczenia do wykresów
     const chartData = computed(() => {
-      // Dane do wykresów
       const dates = allTrainingHistory.value.map((t) => t.date);
       const uniqueDates = [...new Set(dates)].sort();
 
-      // Wykres 1: Treningi w miesiącu
       const trainingsPerMonthData = uniqueDates.map((date) => {
         return allTrainingHistory.value.filter((t) => t.date === date).length;
       });
 
-      // Wykres 2: Objętość treningowa
       const strengthVolumeData = uniqueDates.map((date) => {
         const trainings = allTrainingHistory.value.filter(
           (t) => t.date === date
@@ -153,9 +147,6 @@ export default defineComponent({
         return totalVolume;
       });
 
-      // Wykres 3: Najwyższe ciężary (PR)
-      // To bardziej skomplikowane i wymagałoby zdefiniowania konkretnych typów ćwiczeń do śledzenia PR
-      // Na razie stworzymy prostą wizualizację na podstawie dostępnych danych.
       const prWeightsData: { [key: string]: number } = {};
       allTrainingHistory.value.forEach((training) => {
         training.exercises.forEach((exercise) => {
@@ -213,58 +204,28 @@ export default defineComponent({
       maintainAspectRatio: false,
     };
 
-    const goBack = () => {
-      router.back();
-    };
-
     return {
       stats,
       allTrainingHistory,
       chartData,
       chartOptions,
-      goBack,
     };
   },
 });
 </script>
 
 <style scoped>
-.page-container {
+.view-container {
   padding: 20px;
   text-align: center;
   max-width: 600px;
-  margin: 20px auto;
-  background-color: #f9f9f9;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  position: relative;
+  margin: 0 auto;
 }
-
-.back-button {
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  background-color: #6c757d;
-  color: white;
-  border: none;
-  padding: 8px 15px;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 0.9em;
-  transition: background-color 0.3s ease;
-}
-
-.back-button:hover {
-  background-color: #5a6268;
-}
-
 h1 {
   color: #2c3e50;
   margin-bottom: 30px;
-  padding-top: 20px;
   font-size: 2em;
 }
-
 .stats-section {
   background-color: #ffffff;
   padding: 25px;
@@ -272,31 +233,25 @@ h1 {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   text-align: left;
 }
-
 .info-message {
   text-align: center;
   color: #777;
   font-style: italic;
   margin-bottom: 20px;
 }
-
 .stat-block {
   margin-bottom: 30px;
 }
-
 .stat-block h3 {
   color: #42b983;
   border-bottom: 2px solid #42b983;
   padding-bottom: 5px;
   margin-bottom: 15px;
 }
-
 .chart-container {
   margin-bottom: 30px;
-  /* DODANA KLUCZOWA ZMIANA */
   max-height: 400px;
 }
-
 .chart-container h3 {
   color: #42b983;
   border-bottom: 2px solid #42b983;

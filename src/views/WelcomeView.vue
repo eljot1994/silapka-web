@@ -11,43 +11,36 @@
 
     <div class="welcome-header">
       <h2>Witaj, {{ userEmail }}!</h2>
-      <button @click="handleLogout" class="logout-button" title="Wyloguj">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          height="24px"
-          viewBox="0 0 24 24"
-          width="24px"
-          fill="#FFFFFF"
-        >
-          <path d="M0 0h24v24H0z" fill="none" />
-          <path
-            d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"
-          />
-        </svg>
-      </button>
     </div>
 
     <div class="training-section">
       <h3>
         Aktualny Trening
-        <span v-if="isTrainingActive" class="timer">{{ trainingTime }}</span>
+        <span v-if="isTrainingActive" class="timer">
+          {{ isTrainingPaused ? "Wstrzymano" : trainingTime }}
+        </span>
       </h3>
 
-      <div
+      <button
+        @click="startTraining"
         v-if="!isTrainingActive && currentTraining.length > 0"
-        class="start-training-banner"
+        class="action-button secondary full-width-button"
       >
-        <p>Masz zaplanowany trening. Gotowy, aby zacząć?</p>
-        <button @click="startTraining" class="action-button primary large">
-          Rozpocznij Trening
-        </button>
-      </div>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          height="24px"
+          viewBox="0 0 24 24"
+          width="24px"
+          fill="currentColor"
+        >
+          <path d="M0 0h24v24H0z" fill="none" />
+          <path d="M8 5v14l11-7z" />
+        </svg>
+        Rozpocznij Trening
+      </button>
 
       <div v-if="currentTraining.length === 0" class="no-exercises">
-        <p>Brak zaplanowanych ćwiczeń.</p>
-        <button @click="goToAddExercise" class="action-button">
-          + Dodaj pierwsze ćwiczenie
-        </button>
+        <p>Brak zaplanowanych ćwiczeń w Twoim planie treningowym.</p>
       </div>
 
       <ul v-else class="exercise-list">
@@ -68,7 +61,7 @@
                 class="exercise-checkbox"
                 title="Oznacz całe ćwiczenie jako wykonane"
                 :checked="exercise.done"
-                :disabled="!isTrainingActive"
+                :disabled="!isTrainingActive || isTrainingPaused"
                 @change="toggleExerciseDone(exercise.id)"
               />
               <button
@@ -126,7 +119,7 @@
                       class="set-checkbox"
                       title="Oznacz serię jako wykonaną"
                       :checked="set.done"
-                      :disabled="!isTrainingActive"
+                      :disabled="!isTrainingActive || isTrainingPaused"
                       @change="toggleSetDone(exercise.id, set.id)"
                     />
                     <button
@@ -192,6 +185,15 @@
 
     <div class="main-actions-bar">
       <button @click="goToAddExercise" class="action-button primary">
+        <span>+</span>
+        Dodaj ćwiczenie
+      </button>
+
+      <button
+        @click="pauseTraining"
+        v-if="isTrainingActive && !isTrainingPaused"
+        class="action-button warning"
+      >
         <svg
           xmlns="http://www.w3.org/2000/svg"
           height="24px"
@@ -200,23 +202,52 @@
           fill="currentColor"
         >
           <path d="M0 0h24v24H0z" fill="none" />
-          <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+          <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
         </svg>
-        Dodaj ćwiczenie
+        Zatrzymaj
       </button>
+
+      <button
+        @click="resumeTraining"
+        v-if="isTrainingActive && isTrainingPaused"
+        class="action-button secondary"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          height="24px"
+          viewBox="0 0 24 24"
+          width="24px"
+          fill="currentColor"
+        >
+          <path d="M0 0h24v24H0z" fill="none" />
+          <path d="M8 5v14l11-7z" />
+        </svg>
+        Wznów
+      </button>
+
       <button
         @click="finishTraining"
         v-if="isTrainingActive"
-        class="action-button secondary"
+        class="action-button danger"
       >
-        Zakończ trening
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          height="24px"
+          viewBox="0 0 24 24"
+          width="24px"
+          fill="currentColor"
+        >
+          <path d="M0 0h24v24H0z" fill="none" />
+          <path d="M6 6h12v12H6z" />
+        </svg>
+        Zakończ
       </button>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, ref, onMounted, onUnmounted } from "vue";
+import { defineComponent, computed, ref, onUnmounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { PlannedExercise, Set } from "@/store";
@@ -238,74 +269,22 @@ export default defineComponent({
     );
     const finishTrainingError = ref<string | null>(null);
     const isTrainingActive = computed(() => store.getters.isTrainingActive);
-    const trainingTime = ref("00:00:00");
-    let timerInterval: number | undefined;
-
     const isRestTimerActive = computed(() => store.getters.isRestTimerActive);
     const restTimerSeconds = computed(() => store.getters.restTimerSeconds);
 
-    // Funkcja do aktualizacji wyświetlanego czasu treningu
-    const updateTrainingTime = () => {
-      const startTime = store.state.trainingStartTime;
-      if (startTime) {
-        const diff = Math.floor((Date.now() - startTime) / 1000);
-        const h = Math.floor(diff / 3600)
-          .toString()
-          .padStart(2, "0");
-        const m = Math.floor((diff % 3600) / 60)
-          .toString()
-          .padStart(2, "0");
-        const s = (diff % 60).toString().padStart(2, "0");
-        trainingTime.value = `${h}:${m}:${s}`;
-      } else {
-        trainingTime.value = "00:00:00"; // Reset jeśli czas startu jest null
-      }
-    };
+    const isTrainingPaused = computed(() => store.getters.isTrainingPaused);
+    const trainingTime = computed(() => store.getters.trainingTime);
 
-    const startTraining = () => {
-      // Jeśli trening już jest aktywny, nie rób nic
-      if (store.getters.isTrainingActive) {
-        return;
-      }
-      store.commit("SET_TRAINING_ACTIVE", true);
-      // Uruchomienie interwału i jego przechowywanie
-      timerInterval = window.setInterval(updateTrainingTime, 1000);
-    };
-
-    // Po zamontowaniu komponentu, sprawdź, czy trening jest aktywny i uruchom timer
-    onMounted(() => {
-      if (store.getters.isTrainingActive && !timerInterval) {
-        timerInterval = window.setInterval(updateTrainingTime, 1000);
-      }
-      // Natychmiastowa aktualizacja czasu po wejściu do widoku
-      updateTrainingTime();
-    });
+    const startTraining = () => store.dispatch("startTraining");
+    const pauseTraining = () => store.dispatch("pauseTraining");
+    const resumeTraining = () => store.dispatch("resumeTraining");
 
     onUnmounted(() => {
-      // Czyść interwał tylko jeśli trening NIE JEST aktywny
-      // Jeśli trening jest aktywny, pozwól mu działać w tle
-      if (!store.getters.isTrainingActive && timerInterval) {
-        clearInterval(timerInterval);
-        timerInterval = undefined;
-      }
-      // Stop rest timer zawsze, bo to jest powiązane z widokiem
       store.dispatch("stopRestTimer");
     });
 
-    // ZMIEŃ TĘ FUNKCJĘ
-    const handleLogout = async () => {
-      // <-- DODAJ ASYNC
-      // Upewnij się, że timer jest zatrzymany przy wylogowaniu
-      if (timerInterval) {
-        clearInterval(timerInterval);
-        timerInterval = undefined;
-      }
-      await store.dispatch("logout"); // <-- DODAJ AWAIT
-      router.push({ name: "home" });
-    };
-
     const toggleExerciseDone = (exerciseId: string) => {
-      if (!isTrainingActive.value) return;
+      if (!isTrainingActive.value || isTrainingPaused.value) return;
       const exercise = currentTraining.value.find((ex) => ex.id === exerciseId);
       if (exercise) {
         if (
@@ -330,7 +309,7 @@ export default defineComponent({
     };
 
     const toggleSetDone = (exerciseId: string, setId: string) => {
-      if (!isTrainingActive.value) return;
+      if (!isTrainingActive.value || isTrainingPaused.value) return;
       const exercise = currentTraining.value.find((ex) => ex.id === exerciseId);
       if (exercise && exercise.category === "strength" && exercise.sets) {
         const set = exercise.sets.find((s) => s.id === setId);
@@ -382,23 +361,24 @@ export default defineComponent({
     };
 
     const finishTraining = async () => {
-      finishTrainingError.value = null;
-      try {
-        await store.dispatch("finishCurrentTraining");
-        toast.success("Trening zakończony i zapisany!");
-        // Upewnij się, że timer jest zatrzymany po zakończeniu treningu
-        if (timerInterval) {
-          clearInterval(timerInterval);
-          timerInterval = undefined;
+      if (confirm("Czy na pewno chcesz zakończyć trening?")) {
+        finishTrainingError.value = null;
+        try {
+          await store.dispatch("finishCurrentTraining");
+          toast.success("Trening zakończony i zapisany!");
+          router.push({ name: "history" });
+        } catch (error: any) {
+          toast.error(
+            error.message || "Wystąpił błąd podczas kończenia treningu."
+          );
+          finishTrainingError.value =
+            error.message || "Wystąpił błąd podczas kończenia treningu.";
         }
-        router.push({ name: "history" });
-      } catch (error: any) {
-        toast.error(
-          error.message || "Wystąpił błąd podczas kończenia treningu."
-        );
-        finishTrainingError.value =
-          error.message || "Wystąpił błąd podczas kończenia treningu.";
       }
+    };
+
+    const goToAddExercise = () => {
+      router.push({ name: "add-exercise" });
     };
 
     const saveAsTemplate = () => {
@@ -418,8 +398,10 @@ export default defineComponent({
       trainingTime,
       isRestTimerActive,
       restTimerSeconds,
+      isTrainingPaused,
       startTraining,
-      handleLogout,
+      pauseTraining,
+      resumeTraining,
       toggleExerciseDone,
       toggleSetDone,
       stopRestTimer,
@@ -429,6 +411,7 @@ export default defineComponent({
       removeSet,
       removeExercise,
       finishTraining,
+      goToAddExercise,
       saveAsTemplate,
     };
   },
@@ -438,7 +421,7 @@ export default defineComponent({
 <style scoped>
 /* GENERAL */
 .page-wrapper {
-  padding: 20px 20px 100px 20px; /* Dodatkowy padding na dole dla nawigacji */
+  padding: 20px 20px 100px 20px;
   max-width: 600px;
   margin: 0 auto;
 }
@@ -454,23 +437,6 @@ export default defineComponent({
   color: #2c3e50;
   font-size: 1.8em;
   margin: 0;
-}
-.logout-button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 8px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background-color 0.2s ease;
-}
-.logout-button svg {
-  fill: #5f6368;
-}
-.logout-button:hover {
-  background-color: #f1f3f4;
 }
 
 /* TRAINING SECTION */
@@ -490,23 +456,11 @@ export default defineComponent({
   border-radius: 5px;
 }
 
-/* START BANNER */
-.start-training-banner {
-  background-color: #e8f5e9;
-  border-radius: 12px;
-  padding: 20px;
-  text-align: center;
-  margin-bottom: 20px;
-}
-.start-training-banner p {
-  margin: 0 0 15px 0;
-  color: #333;
-}
-
 /* EXERCISE LIST */
 .exercise-list {
   list-style: none;
   padding: 0;
+  margin-top: 20px;
 }
 .exercise-card {
   background-color: #fff;
@@ -636,11 +590,12 @@ export default defineComponent({
 /* ACTION BUTTONS */
 .main-actions-bar {
   display: flex;
-  gap: 15px;
-  margin-top: 30px;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 20px;
 }
 .action-button {
-  flex: 1;
+  width: 100%;
   padding: 12px 20px;
   border: none;
   border-radius: 8px;
@@ -653,6 +608,10 @@ export default defineComponent({
   justify-content: center;
   gap: 8px;
 }
+.action-button span {
+  font-size: 1.5em;
+  line-height: 1;
+}
 .action-button.primary {
   background-color: #42b983;
   color: white;
@@ -664,36 +623,16 @@ export default defineComponent({
   background-color: #007bff;
   color: white;
 }
-.action-button.large {
-  padding: 15px 25px;
-  font-size: 1.1em;
+.action-button.danger {
+  background-color: #dc3545;
+  color: white;
 }
-
-/* BOTTOM NAVIGATION */
-.bottom-nav {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  justify-content: space-around;
-  background-color: #fff;
-  box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
-  padding: 10px 0;
+.action-button.warning {
+  background-color: #ffc107;
+  color: #212529;
 }
-.nav-button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  color: #5f6368;
-  font-size: 0.75em;
-  gap: 4px;
-}
-.nav-button svg {
-  fill: #5f6368;
+.full-width-button {
+  margin-bottom: 20px;
 }
 
 /* HELPERS & GENERIC */
@@ -714,6 +653,7 @@ export default defineComponent({
   width: 20px;
   height: 20px;
 }
+
 .no-exercises {
   text-align: center;
   padding: 40px 20px;
@@ -721,7 +661,9 @@ export default defineComponent({
   border-radius: 12px;
 }
 .no-exercises p {
-  margin: 0 0 15px 0;
+  margin: 0;
+  color: #777;
+  font-style: italic;
 }
 
 /* SPINNER & LOADING */
@@ -753,7 +695,7 @@ export default defineComponent({
 
 .rest-timer-overlay {
   position: fixed;
-  bottom: 80px; /* Wyżej, żeby nie nachodziło na nawigację */
+  bottom: 80px;
   left: 50%;
   transform: translateX(-50%);
   width: auto;

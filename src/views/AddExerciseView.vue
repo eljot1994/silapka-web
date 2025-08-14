@@ -1,7 +1,6 @@
 <template>
-  <div class="page-container">
+  <div class="add-exercise-container">
     <h1>Dodaj Ćwiczenie do Treningu</h1>
-    <button @click="goBack" class="back-button">Wróć</button>
 
     <div class="add-to-plan-section">
       <p v-if="allExerciseTypes.length === 0" class="info-message">
@@ -111,10 +110,6 @@ export default defineComponent({
       }
     };
 
-    const goBack = () => {
-      router.back();
-    };
-
     const getCategoryName = (category: string) => {
       switch (category) {
         case "strength":
@@ -137,7 +132,6 @@ export default defineComponent({
       groupedExercises,
       isExerciseLocked,
       addExerciseToPlan,
-      goBack,
       getCategoryName,
     };
   },
@@ -145,26 +139,11 @@ export default defineComponent({
 </script>
 
 <style scoped>
-.page-container {
+.add-exercise-container {
   padding: 20px;
   text-align: center;
   max-width: 600px;
-  margin: 20px auto;
-  background-color: #f9f9f9;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  position: relative;
-}
-.back-button {
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  background-color: #6c757d;
-  color: white;
-  border: none;
-  padding: 8px 15px;
-  border-radius: 5px;
-  cursor: pointer;
+  margin: 0 auto;
 }
 h1 {
   color: #2c3e50;

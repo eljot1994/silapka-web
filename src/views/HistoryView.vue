@@ -1,7 +1,6 @@
 <template>
-  <div class="page-container">
+  <div class="view-container">
     <h1>Historia Treningów</h1>
-    <button @click="goBack" class="back-button">Wróć</button>
 
     <div class="history-section">
       <p v-if="sortedTrainingHistory.length === 0" class="info-message">
@@ -91,12 +90,9 @@ export default defineComponent({
   name: "HistoryView",
   setup() {
     const store = useStore();
-    const router = useRouter();
 
-    // Funkcja do konwersji daty w formacie DD.MM.YYYY na obiekt Date
     const parseDate = (dateString: string) => {
       const parts = dateString.split(".");
-      // Uwaga: miesiące w obiekcie Date są indeksowane od 0
       return new Date(
         parseInt(parts[2], 10),
         parseInt(parts[1], 10) - 1,
@@ -105,18 +101,12 @@ export default defineComponent({
     };
 
     const sortedTrainingHistory = computed<TrainingRecord[]>(() => {
-      // Tworzymy kopię, aby nie mutować oryginalnego stanu i sortujemy
       return [...store.getters.allTrainingHistory].sort((a, b) => {
         const dateA = parseDate(a.date);
         const dateB = parseDate(b.date);
-        // Sortowanie malejące - od najnowszej do najstarszej
         return dateB.getTime() - dateA.getTime();
       });
     });
-
-    const goBack = () => {
-      router.back();
-    };
 
     const deleteTraining = (trainingId: string) => {
       if (confirm("Czy na pewno chcesz usunąć ten trening z historii?")) {
@@ -126,7 +116,6 @@ export default defineComponent({
 
     return {
       sortedTrainingHistory,
-      goBack,
       deleteTraining,
     };
   },
@@ -134,6 +123,12 @@ export default defineComponent({
 </script>
 
 <style scoped>
+.view-container {
+  padding: 20px;
+  text-align: center;
+  max-width: 600px;
+  margin: 0 auto;
+}
 .training-header {
   display: flex;
   justify-content: space-between;
@@ -155,39 +150,10 @@ export default defineComponent({
   color: #555;
   font-weight: normal;
 }
-.page-container {
-  padding: 20px;
-  text-align: center;
-  max-width: 600px;
-  margin: 20px auto;
-  background-color: #f9f9f9;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  position: relative;
-}
-
-.back-button {
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  background-color: #6c757d;
-  color: white;
-  border: none;
-  padding: 8px 15px;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 0.9em;
-  transition: background-color 0.3s ease;
-}
-
-.back-button:hover {
-  background-color: #5a6268;
-}
 
 h1 {
   color: #2c3e50;
   margin-bottom: 30px;
-  padding-top: 20px;
   font-size: 2em;
 }
 

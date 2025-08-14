@@ -1,7 +1,6 @@
 <template>
-  <div class="page-container">
+  <div class="view-container">
     <h1>Typy Ćwiczeń</h1>
-    <button @click="goBack" class="back-button">Wróć</button>
 
     <div class="exercise-types-section">
       <h3>
@@ -235,10 +234,6 @@ export default defineComponent({
       }
     };
 
-    const goBack = () => {
-      router.back();
-    };
-
     const getMaxWeight = (sets: SessionSet[] | undefined) => {
       if (!sets) return 0;
       return sets.reduce(
@@ -312,7 +307,6 @@ export default defineComponent({
       partieMiesniowe,
       handleFormSubmit,
       getCategoryName,
-      goBack,
       getMaxWeight,
       getStats,
       editType,
@@ -324,7 +318,16 @@ export default defineComponent({
 </script>
 
 <style scoped>
-/* Style pozostają takie same */
+.view-container {
+  padding: 20px;
+  text-align: center;
+  max-width: 600px;
+  margin: 0 auto;
+}
+h1 {
+  color: #2c3e50;
+  margin-bottom: 30px;
+}
 .cancel-button {
   background-color: #6c757d;
   margin-top: 10px;
@@ -355,42 +358,6 @@ export default defineComponent({
   background-color: #dc3545;
   color: white;
 }
-.page-container {
-  padding: 20px;
-  text-align: center;
-  max-width: 600px;
-  margin: 20px auto;
-  background-color: #f9f9f9;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  position: relative;
-}
-
-.back-button {
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  background-color: #6c757d;
-  color: white;
-  border: none;
-  padding: 8px 15px;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 0.9em;
-  transition: background-color 0.3s ease;
-}
-
-.back-button:hover {
-  background-color: #5a6268;
-}
-
-h1 {
-  color: #2c3e50;
-  margin-bottom: 30px;
-  padding-top: 20px;
-  font-size: 2em;
-}
-
 .exercise-types-section {
   background-color: #ffffff;
   padding: 25px;

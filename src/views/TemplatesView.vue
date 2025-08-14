@@ -1,7 +1,6 @@
 <template>
-  <div class="page-container">
+  <div class="view-container">
     <h1>Szablony Treningów</h1>
-    <button @click="goBack" class="back-button">Wróć</button>
 
     <div class="templates-section">
       <p v-if="templates.length === 0" class="info-message">
@@ -45,10 +44,6 @@ export default defineComponent({
       () => store.getters.allTrainingTemplates
     );
 
-    const goBack = () => {
-      router.back();
-    };
-
     const loadTemplate = (templateId: string) => {
       if (
         confirm(
@@ -68,7 +63,6 @@ export default defineComponent({
 
     return {
       templates,
-      goBack,
       loadTemplate,
       deleteTemplate,
     };
@@ -77,28 +71,11 @@ export default defineComponent({
 </script>
 
 <style scoped>
-/* Style podobne do HistoryView dla spójności */
-.page-container {
+.view-container {
   padding: 20px;
   text-align: center;
   max-width: 600px;
-  margin: 20px auto;
-  background-color: #f9f9f9;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  position: relative;
-}
-
-.back-button {
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  background-color: #6c757d;
-  color: white;
-  border: none;
-  padding: 8px 15px;
-  border-radius: 5px;
-  cursor: pointer;
+  margin: 0 auto;
 }
 
 h1 {
