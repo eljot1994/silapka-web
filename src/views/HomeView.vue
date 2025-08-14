@@ -1,13 +1,109 @@
+<template>
+  <div class="home-container">
+    <h1>Witaj w Siłapce!</h1>
+    <p>Twoja aplikacja do śledzenia postępów na siłowni.</p>
+
+    <div class="form-container">
+      <div class="form-toggle">
+        <button
+          @click="isLogin = true"
+          :class="{ active: isLogin }"
+          class="toggle-button"
+        >
+          Logowanie
+        </button>
+        <button
+          @click="isLogin = false"
+          :class="{ active: !isLogin }"
+          class="toggle-button"
+        >
+          Rejestracja
+        </button>
+      </div>
+
+      <form v-if="isLogin" @submit.prevent="handleLogin" class="auth-form">
+        <h3>Zaloguj się</h3>
+        <div class="form-group">
+          <input
+            type="email"
+            placeholder="Email"
+            v-model="loginForm.email"
+            required
+          />
+        </div>
+        <div class="form-group">
+          <input
+            type="password"
+            placeholder="Hasło"
+            v-model="loginForm.password"
+            required
+          />
+        </div>
+        <button type="submit" :disabled="isLoading">
+          <span v-if="isLoading" class="spinner"></span>
+          <span v-else>Zaloguj</span>
+        </button>
+      </form>
+
+      <form v-else @submit.prevent="handleSignup" class="auth-form">
+        <h3>Zarejestruj się</h3>
+        <div class="form-group">
+          <input
+            type="email"
+            placeholder="Email"
+            v-model="signupForm.email"
+            @blur="validateEmail"
+            required
+          />
+          <p v-if="signupErrors.email" class="validation-error">
+            {{ signupErrors.email }}
+          </p>
+        </div>
+        <div class="form-group">
+          <input
+            type="password"
+            placeholder="Hasło"
+            v-model="signupForm.password"
+            @blur="validatePassword"
+            required
+          />
+          <p v-if="signupErrors.password" class="validation-error">
+            {{ signupErrors.password }}
+          </p>
+        </div>
+        <div class="form-group">
+          <input
+            type="password"
+            placeholder="Potwierdź hasło"
+            v-model="signupForm.confirmPassword"
+            @blur="validateConfirmPassword"
+            required
+          />
+          <p v-if="signupErrors.confirmPassword" class="validation-error">
+            {{ signupErrors.confirmPassword }}
+          </p>
+        </div>
+        <button type="submit" :disabled="isLoading">
+          <span v-if="isLoading" class="spinner"></span>
+          <span v-else>Zarejestruj</span>
+        </button>
+      </form>
+
+      <p v-if="authError" class="error-message">{{ authError }}</p>
+    </div>
+  </div>
+</template>
+
 <script lang="ts">
 import { defineComponent, ref } from "vue";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router"; // <-- 1. Zaimportowano useRouter
+import { useRouter } from "vue-router";
 
 export default defineComponent({
   name: "HomeView",
   setup() {
     const store = useStore();
-    const router = useRouter(); // <-- 2. Użyto useRouter
+    const router = useRouter();
 
     const isLogin = ref(true);
     const authError = ref<string | null>(null);
@@ -83,6 +179,7 @@ export default defineComponent({
       isLoading.value = true;
       try {
         await store.dispatch("login", loginForm.value);
+        router.push({ name: "welcome" });
       } catch (error: any) {
         authError.value = "Nie udało się zalogować. Sprawdź email i hasło.";
       } finally {
@@ -99,6 +196,7 @@ export default defineComponent({
             email: signupForm.value.email,
             password: signupForm.value.password,
           });
+          router.push({ name: "welcome" });
         } catch (error: any) {
           authError.value = "Nie udało się zarejestrować. Spróbuj ponownie.";
         } finally {
@@ -125,7 +223,6 @@ export default defineComponent({
 </script>
 
 <style scoped>
-/* ... (style z poprzedniej odpowiedzi bez zmian) ... */
 .spinner {
   display: inline-block;
   width: 20px;
@@ -141,7 +238,6 @@ export default defineComponent({
     transform: rotate(360deg);
   }
 }
-/* ... (reszta stylów bez zmian) ... */
 .home-container {
   text-align: center;
   padding: 40px 20px;
