@@ -10,8 +10,6 @@ import { onAuthStateChanged } from "firebase/auth";
 import Toast, { PluginOptions, POSITION } from "vue-toastification";
 import "vue-toastification/dist/index.css";
 
-let app: any;
-
 // Opcje konfiguracyjne dla powiadomień
 const options: PluginOptions = {
   // 2. Użyj POSITION.TOP_RIGHT zamiast tekstu
@@ -28,25 +26,35 @@ const options: PluginOptions = {
   icon: true,
   rtl: false,
 };
+// --- POCZĄTEK ZMIAN ---
 
-onAuthStateChanged(auth, async (user) => {
-  if (store.state.currentUser === null && user) {
-    store.commit("SET_USER", { uid: user.uid, email: user.email });
-    if (!store.state.authIsReady) {
-      // Zapobiegaj wielokrotnemu pobieraniu danych
-      await store.dispatch("fetchUserData");
+// 1. Utwórz aplikację od razu
+const app = createApp(App).use(store).use(router).use(Toast, options);
+
+// 2. Przenieś logikę z onAuthStateChanged do osobnej funkcji
+const initializeAuth = () => {
+  onAuthStateChanged(auth, async (user) => {
+    if (store.state.currentUser === null && user) {
+      store.commit("SET_USER", { uid: user.uid, email: user.email });
+      if (!store.state.authIsReady) {
+        // Zapobiegaj wielokrotnemu pobieraniu danych
+        await store.dispatch("fetchUserData");
+      }
     }
-  }
 
-  if (!store.state.authIsReady) {
-    store.commit("SET_AUTH_IS_READY", true);
-  }
+    if (!store.state.authIsReady) {
+      store.commit("SET_AUTH_IS_READY", true);
+    }
 
-  if (!app) {
-    app = createApp(App)
-      .use(store)
-      .use(router)
-      .use(Toast, options)
-      .mount("#app");
-  }
-});
+    // 3. Zamontuj aplikację dopiero po pierwszym sprawdzeniu autoryzacji
+    //    i tylko wtedy, gdy nie została jeszcze zamontowana.
+    if (!app._container) {
+      app.mount("#app");
+    }
+  });
+};
+
+// 4. Wywołaj funkcję inicjalizującą
+initializeAuth();
+
+// --- KONIEC ZMIAN ---

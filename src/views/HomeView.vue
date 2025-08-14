@@ -28,6 +28,7 @@
             type="email"
             placeholder="Email"
             v-model="loginForm.email"
+            x
             required
           />
         </div>
