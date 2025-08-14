@@ -1,0 +1,45 @@
+## Główne Funkcjonalności @feature
+
+### Ocena Treningu (RPE) i Notatki @feedback
+  ☐ Stworzyć ekran podsumowania po zakończeniu treningu @ui
+  ☐ Dodać komponent do oceny całego treningu w skali RPE (1-10) @ui
+  ☐ Dodać możliwość dodawania notatek tekstowych do poszczególnych ćwiczeń @ui
+  ☐ Zaimplementować zapisywanie RPE i notatek w bazie danych @logic
+  ☐ Dodać w widoku "Historia Treningów" opcję przeglądania notatek i RPE @ui @logic
+
+### Zaawansowane Pomiary Ciała @tracking
+  ☐ Stworzyć nową stronę "Pomiary" w sekcji "Profil" @ui
+  ☐ Zbudować formularz do regularnego zapisywania wymiarów (waga, obwód ramienia, etc.) @ui
+  ☐ Przygotować proste instrukcje i grafiki, jak poprawnie dokonywać pomiarów @content
+  ☐ Zaimplementować system powiadomień/przypomnień (np. co 2 tygodnie) @logic
+  ☐ Dodać wykresy do wizualizacji postępów w pomiarach @ui @logic
+
+### Inteligentne Szablony i Sugestie Progresji @ai @logic
+  ☐ Zaimplementować logikę pytania "Czy chcesz zaktualizować szablon?" po treningu na szablonie
+  ☐ Zaimplementować logikę pytania "Czy chcesz zapisać jako nowy szablon?" po treningu bez szablonu
+  ☐ Stworzyć mechanizm sugestii progresji (np. automatyczne proponowanie większego ciężaru)
+
+---
+## Ustawienia i Poprawki Jakościowe @settings
+
+### Przełącznik Jednostek Wagi (KG / LB)
+  ☐ Dodać w ustawieniach opcję wyboru preferowanej jednostki (kg/lb) @ui
+  ☐ Zapewnić, że wybór jednostki jest respektowany w całej aplikacji @logic
+
+### Tryb Ciemny (Dark Mode) @ui
+  ☐ Dodać w ustawieniach przełącznik aktywujący ciemny motyw @ui
+  ☐ Zaprojektować i zaimplementować paletę kolorów dla trybu ciemnego @design @css
+  ☐ Zastosować style trybu ciemnego w całej aplikacji
+
+---
+## Nowe Pomysły @new
+
+### Eksport Danych dla Trenera AI @export @ai
+  ☐ Dodać w profilu opcję "Eksport dla Trenera AI" @ui
+  ☐ Stworzyć logikę, która zbiera i konsoliduje wszystkie dane użytkownika @logic
+    ☐ Zbierz historię treningów
+    ☐ Zbierz oceny RPE
+    ☐ Zbierz notatki do ćwiczeń
+    ☐ Zbierz historię pomiarów ciała
+  ☐ Sformatować zebrane dane jako jeden, gotowy do skopiowania blok tekstu (prompt) @logic
+  ☐ Dodać przycisk "Kopiuj do schowka" @ui
