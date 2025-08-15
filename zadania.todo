@@ -1,8 +1,8 @@
 ## Poprawki i Refaktoryzacja @improvement
 
 ### krytyczne Bezpieczeństwo @security
-  ☐ Przenieść klucze Firebase API z kodu źródłowego (`src/firebase.ts`) do zmiennych środowiskowych (`.env.local`)
-  ☐ Dodać `.env.local` do pliku `.gitignore`
+  ✔ Przenieść klucze Firebase API z kodu źródłowego (`src/firebase.ts`) do zmiennych środowiskowych (`.env.local`) @done(25-08-15 16:17)
+  ✔ Dodać `.env.local` do pliku `.gitignore` @done(25-08-15 16:17)
 
 ### Optymalizacja Operacji na Bazie Danych @performance @db
   ☐ Zrefaktoryzować akcje Vuex (`updateExerciseType`, `deleteTrainingFromHistory`, `deleteTemplate`) tak, aby używały `arrayRemove` lub aktualizacji konkretnych pól zamiast nadpisywania całych tablic w Firestore

@@ -1,8 +1,6 @@
 <template>
   <div class="view-container">
-    <button @click="goBackToProfile" class="back-button">
-      &larr; Wróć do profilu
-    </button>
+    <BackButton :to="{ name: 'profile' }" text="Wróć do profilu" />
     <h1>Ustawienia</h1>
     <form @submit.prevent="saveSettings" class="settings-form">
       <div class="form-group">
@@ -24,16 +22,16 @@
 import { defineComponent, ref } from "vue";
 import { useStore } from "vuex";
 import { useToast } from "vue-toastification";
-import { useRouter } from "vue-router";
+import BackButton from "@/components/BackButton.vue";
 
 export default defineComponent({
   name: "ProfileSettingsView",
+  components: {
+    BackButton,
+  },
   setup() {
     const store = useStore();
     const toast = useToast();
-    const router = useRouter();
-
-    const goBackToProfile = () => router.push({ name: "profile" });
 
     const settings = ref({ ...store.getters.userSettings });
 
@@ -49,28 +47,18 @@ export default defineComponent({
     return {
       settings,
       saveSettings,
-      goBackToProfile,
     };
   },
 });
 </script>
 
 <style scoped>
+/* Style pozostają takie same, usunięto tylko .back-button */
 .view-container {
   padding: 20px;
   max-width: 600px;
   margin: 0 auto;
   position: relative;
-}
-.back-button {
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  background: none;
-  border: none;
-  font-weight: bold;
-  cursor: pointer;
-  color: #007bff;
 }
 h1 {
   text-align: center;

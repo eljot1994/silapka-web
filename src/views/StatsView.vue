@@ -1,8 +1,6 @@
 <template>
   <div class="view-container">
-    <button @click="goBackToProfile" class="back-button">
-      &larr; Wróć do profilu
-    </button>
+    <BackButton :to="{ name: 'profile' }" text="Wróć do profilu" />
     <h1>Twoje Statystyki Treningowe</h1>
 
     <div class="stats-section">
@@ -50,7 +48,6 @@
 <script lang="ts">
 import { defineComponent, computed } from "vue";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
 import { TrainingRecord } from "@/store";
 import { Bar, Line } from "vue-chartjs";
 import {
@@ -64,6 +61,7 @@ import {
   PointElement,
   LineElement,
 } from "chart.js";
+import BackButton from "@/components/BackButton.vue";
 
 ChartJS.register(
   Title,
@@ -81,12 +79,10 @@ export default defineComponent({
   components: {
     Bar,
     Line,
+    BackButton,
   },
   setup() {
     const store = useStore();
-    const router = useRouter();
-
-    const goBackToProfile = () => router.push({ name: "profile" });
 
     const allTrainingHistory = computed<TrainingRecord[]>(
       () => store.getters.allTrainingHistory
@@ -207,29 +203,19 @@ export default defineComponent({
       allTrainingHistory,
       chartData,
       chartOptions,
-      goBackToProfile,
     };
   },
 });
 </script>
 
 <style scoped>
+/* Style pozostają takie same, usunięto tylko .back-button */
 .view-container {
   padding: 20px;
   text-align: center;
   max-width: 600px;
   margin: 0 auto;
   position: relative;
-}
-.back-button {
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  background: none;
-  border: none;
-  font-weight: bold;
-  cursor: pointer;
-  color: #007bff;
 }
 h1 {
   color: #2c3e50;

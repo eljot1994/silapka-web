@@ -440,12 +440,22 @@ const store = createStore<State>({
     async updateExerciseType({ commit, state }, updatedType: ExerciseType) {
       if (state.currentUser) {
         const userRef = doc(db, "users", state.currentUser.uid);
-        const updatedTypes = state.exerciseTypes.map((t) =>
-          t.id === updatedType.id
-            ? removeUndefined(updatedType)
-            : removeUndefined(t)
+
+        // Znajdź starą wersję obiektu do usunięcia
+        const oldType = state.exerciseTypes.find(
+          (t) => t.id === updatedType.id
         );
-        await updateDoc(userRef, { exerciseTypes: updatedTypes });
+
+        if (oldType) {
+          // Usuń stary obiekt i dodaj nowy w jednej operacji
+          await updateDoc(userRef, {
+            exerciseTypes: arrayRemove(removeUndefined(oldType)),
+          });
+          await updateDoc(userRef, {
+            exerciseTypes: arrayUnion(removeUndefined(updatedType)),
+          });
+        }
+
         commit("UPDATE_EXERCISE_TYPE", updatedType);
       }
     },

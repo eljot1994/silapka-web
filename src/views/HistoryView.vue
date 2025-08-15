@@ -1,8 +1,6 @@
 <template>
   <div class="view-container">
-    <button @click="goBackToProfile" class="back-button">
-      &larr; Wróć do profilu
-    </button>
+    <BackButton :to="{ name: 'profile' }" text="Wróć do profilu" />
     <h1>Historia Treningów</h1>
 
     <div class="history-section">
@@ -86,25 +84,17 @@
 <script lang="ts">
 import { defineComponent, computed } from "vue";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
 import { TrainingRecord } from "@/store";
+import BackButton from "@/components/BackButton.vue";
+import { parseDate } from "@/utils/date";
 
 export default defineComponent({
   name: "HistoryView",
+  components: {
+    BackButton,
+  },
   setup() {
     const store = useStore();
-    const router = useRouter();
-
-    const goBackToProfile = () => router.push({ name: "profile" });
-
-    const parseDate = (dateString: string) => {
-      const parts = dateString.split(".");
-      return new Date(
-        parseInt(parts[2], 10),
-        parseInt(parts[1], 10) - 1,
-        parseInt(parts[0], 10)
-      );
-    };
 
     const sortedTrainingHistory = computed<TrainingRecord[]>(() => {
       return [...store.getters.allTrainingHistory].sort((a, b) => {
@@ -123,29 +113,19 @@ export default defineComponent({
     return {
       sortedTrainingHistory,
       deleteTraining,
-      goBackToProfile,
     };
   },
 });
 </script>
 
 <style scoped>
+/* Style pozostają takie same, usunięto tylko .back-button */
 .view-container {
   padding: 20px;
   text-align: center;
   max-width: 600px;
   margin: 0 auto;
   position: relative;
-}
-.back-button {
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  background: none;
-  border: none;
-  font-weight: bold;
-  cursor: pointer;
-  color: #007bff;
 }
 .training-header {
   display: flex;
