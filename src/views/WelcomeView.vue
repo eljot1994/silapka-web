@@ -42,169 +42,20 @@
       </div>
 
       <ul v-else class="exercise-list">
-        <li
+        <ExerciseCard
           v-for="exercise in currentTraining"
           :key="exercise.id"
-          class="exercise-card"
-          :class="{
-            'exercise-done': exercise.done,
-          }"
-        >
-          <div class="card-header">
-            <span class="exercise-name">{{ exercise.name }}</span>
-            <button
-              @click="removeExercise(exercise.id)"
-              class="icon-button remove-exercise-button"
-              title="Usuń ćwiczenie z planu"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                height="24px"
-                viewBox="0 0 24 24"
-                width="24px"
-                fill="currentColor"
-              >
-                <path d="M0 0h24v24H0z" fill="none" />
-                <path
-                  d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
-                />
-              </svg>
-            </button>
-          </div>
-
-          <div class="card-content">
-            <template v-if="exercise.category === 'strength'">
-              <ul class="set-list">
-                <li
-                  v-for="(set, index) in exercise.sets"
-                  :key="set.id"
-                  class="set-item"
-                  :class="{ 'set-done': set.done }"
-                >
-                  <button
-                    @click="toggleSetDone(exercise, set.id, index)"
-                    class="set-status-button"
-                    :disabled="
-                      !isTrainingActive ||
-                      isTrainingPaused ||
-                      isSetLocked(exercise.sets, index)
-                    "
-                  >
-                    <span v-if="!set.done" class="set-index">{{
-                      index + 1
-                    }}</span>
-                    <svg
-                      v-else
-                      class="set-check-icon"
-                      xmlns="http://www.w3.org/2000/svg"
-                      height="24px"
-                      viewBox="0 0 24 24"
-                      width="24px"
-                      fill="white"
-                    >
-                      <path d="M0 0h24v24H0z" fill="none" />
-                      <path
-                        d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"
-                      />
-                    </svg>
-                  </button>
-                  <div class="set-inputs">
-                    <div class="input-group">
-                      <label :for="`weight-${set.id}`">Ciężar (kg)</label>
-                      <input
-                        :id="`weight-${set.id}`"
-                        type="number"
-                        v-model.number="set.weight"
-                        @input="updateSetInStore(exercise.id, set)"
-                        placeholder="0"
-                      />
-                    </div>
-                    <div class="input-group">
-                      <label :for="`reps-${set.id}`">Powtórzenia</label>
-                      <input
-                        :id="`reps-${set.id}`"
-                        type="number"
-                        v-model.number="set.reps"
-                        @input="updateSetInStore(exercise.id, set)"
-                        placeholder="0"
-                      />
-                    </div>
-                  </div>
-                  <button
-                    @click="removeSet(exercise.id, set.id)"
-                    class="icon-button remove-set-button"
-                    title="Usuń serię"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      height="24px"
-                      viewBox="0 0 24 24"
-                      width="24px"
-                      fill="currentColor"
-                    >
-                      <path d="M0 0h24v24H0V0z" fill="none" />
-                      <path
-                        d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
-                      />
-                    </svg>
-                  </button>
-                </li>
-              </ul>
-              <button @click="addSet(exercise.id)" class="add-set-button">
-                + Dodaj serię
-              </button>
-            </template>
-
-            <template v-else>
-              <div class="other-exercise-wrapper">
-                <button
-                  @click="toggleExerciseDone(exercise.id)"
-                  class="set-status-button"
-                  :class="{ done: exercise.done }"
-                  :disabled="!isTrainingActive || isTrainingPaused"
-                >
-                  <svg
-                    v-if="exercise.done"
-                    class="set-check-icon"
-                    xmlns="http://www.w3.org/2000/svg"
-                    height="24px"
-                    viewBox="0 0 24 24"
-                    width="24px"
-                    fill="white"
-                  >
-                    <path d="M0 0h24v24H0z" fill="none" />
-                    <path
-                      d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"
-                    />
-                  </svg>
-                </button>
-                <div class="other-exercise-inputs">
-                  <div
-                    class="input-group"
-                    v-if="exercise.duration !== undefined"
-                  >
-                    <label>Długość (min)</label>
-                    <input
-                      type="number"
-                      v-model.number="exercise.duration"
-                      @input="updateExerciseInStore(exercise)"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div class="input-group" v-if="exercise.reps !== undefined">
-                    <label>Powtórzenia</label>
-                    <input
-                      type="number"
-                      v-model.number="exercise.reps"
-                      @input="updateExerciseInStore(exercise)"
-                      placeholder="0"
-                    />
-                  </div>
-                </div>
-              </div>
-            </template>
-          </div>
-        </li>
+          :exercise="exercise"
+          :is-training-active="isTrainingActive"
+          :is-training-paused="isTrainingPaused"
+          @remove-exercise="removeExercise"
+          @toggle-set-done="handleToggleSetDone"
+          @update-set="handleUpdateSet"
+          @remove-set="handleRemoveSet"
+          @add-set="addSet"
+          @toggle-exercise-done="toggleExerciseDone"
+          @update-exercise="updateExerciseInStore"
+        />
       </ul>
       <button
         @click="saveAsTemplate"
@@ -227,92 +78,50 @@
       </button>
     </div>
 
-    <div class="main-actions-bar">
-      <button @click="goToAddExercise" class="action-button primary">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          height="24px"
-          viewBox="0 0 24 24"
-          width="24px"
-          fill="currentColor"
-        >
-          <path d="M0 0h24v24H0z" fill="none" />
-          <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
-        </svg>
-        Dodaj ćwiczenie
-      </button>
-
-      <button
-        @click="pauseTraining"
-        v-if="isTrainingActive && !isTrainingPaused"
-        class="action-button warning"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          height="24px"
-          viewBox="0 0 24 24"
-          width="24px"
-          fill="currentColor"
-        >
-          <path d="M0 0h24v24H0z" fill="none" />
-          <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-        </svg>
-        Zatrzymaj
-      </button>
-
-      <button
-        @click="resumeTraining"
-        v-if="isTrainingActive && isTrainingPaused"
-        class="action-button secondary"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          height="24px"
-          viewBox="0 0 24 24"
-          width="24px"
-          fill="currentColor"
-        >
-          <path d="M0 0h24v24H0z" fill="none" />
-          <path d="M8 5v14l11-7z" />
-        </svg>
-        Wznów
-      </button>
-
-      <button
-        @click="finishTraining"
-        v-if="isTrainingActive"
-        class="action-button danger"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          height="24px"
-          viewBox="0 0 24 24"
-          width="24px"
-          fill="currentColor"
-        >
-          <path d="M0 0h24v24H0z" fill="none" />
-          <path d="M6 6h12v12H6z" />
-        </svg>
-        Zakończ
-      </button>
-    </div>
+    <TrainingControls
+      :is-training-active="isTrainingActive"
+      :is-training-paused="isTrainingPaused"
+      @add-exercise="goToAddExercise"
+      @pause-training="pauseTraining"
+      @resume-training="resumeTraining"
+      @finish-training="finishTraining"
+      @cancel-training="handleCancelTraining"
+    />
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, ref, onUnmounted } from "vue";
+import { defineComponent, computed, onUnmounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { PlannedExercise, Set } from "@/store";
 import { useToast } from "vue-toastification";
+import ExerciseCard from "@/components/ExerciseCard.vue";
+import TrainingControls from "@/components/TrainingControls.vue";
+import { useTrainingTimer } from "@/composables/useTrainingTimer"; // 1. Import nowej logiki
 
 export default defineComponent({
   name: "WelcomeView",
+  components: {
+    ExerciseCard,
+    TrainingControls,
+  },
   setup() {
     const store = useStore();
     const router = useRouter();
     const toast = useToast();
 
+    // 2. Wykorzystanie composable'a do zarządzania timerem
+    const {
+      isTrainingActive,
+      isTrainingPaused,
+      trainingTime,
+      startTraining,
+      pauseTraining,
+      resumeTraining,
+    } = useTrainingTimer();
+
+    // Pozostałe właściwości i funkcje, które nie są związane z timerem
     const authIsReady = computed(() => store.getters.authIsReady);
     const userEmail = computed(
       () => store.getters.currentUser?.email || "Gościu"
@@ -320,28 +129,22 @@ export default defineComponent({
     const currentTraining = computed<PlannedExercise[]>(
       () => store.getters.currentPlannedTraining
     );
-    const finishTrainingError = ref<string | null>(null);
-    const isTrainingActive = computed(() => store.getters.isTrainingActive);
     const isRestTimerActive = computed(() => store.getters.isRestTimerActive);
     const restTimerSeconds = computed(() => store.getters.restTimerSeconds);
 
-    const isTrainingPaused = computed(() => store.getters.isTrainingPaused);
-    const trainingTime = computed(() => store.getters.trainingTime);
-
-    const startTraining = () => store.dispatch("startTraining");
-    const pauseTraining = () => store.dispatch("pauseTraining");
-    const resumeTraining = () => store.dispatch("resumeTraining");
+    const handleCancelTraining = () => {
+      if (
+        confirm(
+          "Czy na pewno chcesz anulować ten trening? Postęp nie zostanie zapisany, a licznik zostanie zresetowany."
+        )
+      ) {
+        store.dispatch("cancelTraining");
+      }
+    };
 
     onUnmounted(() => {
       store.dispatch("stopRestTimer");
     });
-
-    const isSetLocked = (sets: Set[] | undefined, index: number) => {
-      if (!sets || index === 0) {
-        return false;
-      }
-      return !sets[index - 1].done;
-    };
 
     const toggleExerciseDone = (exerciseId: string) => {
       if (!isTrainingActive.value || isTrainingPaused.value) return;
@@ -360,6 +163,25 @@ export default defineComponent({
       }
     };
 
+    const isSetLocked = (sets: Set[] | undefined, index: number) => {
+      if (!sets || index === 0) {
+        return false;
+      }
+      return !sets[index - 1].done;
+    };
+
+    const handleToggleSetDone = ({
+      exercise,
+      setId,
+      index,
+    }: {
+      exercise: PlannedExercise;
+      setId: string;
+      index: number;
+    }) => {
+      toggleSetDone(exercise, setId, index);
+    };
+
     const toggleSetDone = (
       exercise: PlannedExercise,
       setId: string,
@@ -373,16 +195,13 @@ export default defineComponent({
       const set = sets.find((s) => s.id === setId);
       if (!set) return;
 
-      // Logika dla ODZNACZANIA
       if (set.done) {
         const hasLaterDoneSet = sets.some((s, i) => i > index && s.done);
         if (hasLaterDoneSet) {
           toast.warning("Odznacz najpierw ostatnią wykonaną serię.");
           return;
         }
-      }
-      // Logika dla ZAZNACZANIA
-      else {
+      } else {
         if (isSetLocked(sets, index)) {
           toast.warning("Ukończ najpierw poprzednią serię.");
           return;
@@ -400,14 +219,19 @@ export default defineComponent({
       }
     };
 
-    const stopRestTimer = () => {
-      store.dispatch("stopRestTimer");
-    };
-
-    const addSet = (exerciseId: string) => {
+    const stopRestTimer = () => store.dispatch("stopRestTimer");
+    const addSet = (exerciseId: string) =>
       store.dispatch("addSet", { exerciseId });
-    };
 
+    const handleUpdateSet = ({
+      exerciseId,
+      set,
+    }: {
+      exerciseId: string;
+      set: Set;
+    }) => {
+      updateSetInStore(exerciseId, set);
+    };
     const updateSetInStore = (exerciseId: string, set: Set) => {
       store.dispatch("updateSet", { exerciseId, updatedSet: set });
     };
@@ -416,6 +240,15 @@ export default defineComponent({
       store.dispatch("updateExerciseInPlan", exercise);
     };
 
+    const handleRemoveSet = ({
+      exerciseId,
+      setId,
+    }: {
+      exerciseId: string;
+      setId: string;
+    }) => {
+      removeSet(exerciseId, setId);
+    };
     const removeSet = (exerciseId: string, setId: string) => {
       if (confirm("Czy na pewno chcesz usunąć tę serię?")) {
         store.dispatch("removeSet", { exerciseId, setId });
@@ -430,24 +263,20 @@ export default defineComponent({
 
     const finishTraining = async () => {
       if (confirm("Czy na pewno chcesz zakończyć trening?")) {
-        finishTrainingError.value = null;
         try {
           await store.dispatch("finishCurrentTraining");
           toast.success("Trening zakończony i zapisany!");
           router.push({ name: "history" });
-        } catch (error: any) {
+        } catch (e: unknown) {
+          const error = e as Error;
           toast.error(
             error.message || "Wystąpił błąd podczas kończenia treningu."
           );
-          finishTrainingError.value =
-            error.message || "Wystąpił błąd podczas kończenia treningu.";
         }
       }
     };
 
-    const goToAddExercise = () => {
-      router.push({ name: "add-exercise" });
-    };
+    const goToAddExercise = () => router.push({ name: "add-exercise" });
 
     const saveAsTemplate = () => {
       const name = prompt("Podaj nazwę dla szablonu:");
@@ -461,23 +290,22 @@ export default defineComponent({
       authIsReady,
       userEmail,
       currentTraining,
-      finishTrainingError,
       isTrainingActive,
       trainingTime,
       isRestTimerActive,
       restTimerSeconds,
       isTrainingPaused,
+      handleCancelTraining,
       startTraining,
       pauseTraining,
       resumeTraining,
-      isSetLocked,
       toggleExerciseDone,
-      toggleSetDone,
+      handleToggleSetDone,
       stopRestTimer,
       addSet,
-      updateSetInStore,
+      handleUpdateSet,
       updateExerciseInStore,
-      removeSet,
+      handleRemoveSet,
       removeExercise,
       finishTraining,
       goToAddExercise,
@@ -529,132 +357,6 @@ export default defineComponent({
   list-style: none;
   padding: 0;
   margin-top: 20px;
-}
-.exercise-card {
-  background-color: #fff;
-  border-radius: 12px;
-  margin-bottom: 20px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
-  overflow: hidden;
-  border: 1px solid #e8e8e8;
-}
-.exercise-done > .card-header {
-  border-left: 5px solid #42b983;
-}
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 15px;
-  background-color: #f7f9fc;
-  border-left: 5px solid transparent;
-}
-.exercise-name {
-  font-weight: bold;
-  font-size: 1.2em;
-}
-.remove-exercise-button {
-  color: #888;
-}
-.card-content {
-  padding: 15px;
-}
-
-/* SET & OTHER EXERCISE STATUS BUTTON */
-.set-status-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: 2px solid #ccc;
-  background-color: #fff;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all 0.2s;
-}
-.set-status-button:disabled {
-  background-color: #f5f5f5;
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-.set-status-button.done,
-.set-item.set-done .set-status-button {
-  background-color: #42b983;
-  border-color: #42b983;
-}
-.set-check-icon {
-  fill: white;
-}
-.set-index {
-  font-size: 1.2em;
-  font-weight: bold;
-  color: #333;
-}
-
-/* UKŁAD SERII */
-.set-list {
-  list-style: none;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.set-item {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
-.set-inputs {
-  display: flex;
-  flex-grow: 1;
-  gap: 10px;
-  min-width: 0;
-}
-.input-group {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-}
-.input-group label {
-  font-size: 0.8em;
-  color: #666;
-  margin-bottom: 4px;
-}
-.input-group input {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  text-align: center;
-  font-size: 1.1em;
-}
-.remove-set-button {
-  color: #e57373;
-  flex-shrink: 0;
-}
-.add-set-button {
-  background: none;
-  border: 2px dashed #ccc;
-  border-radius: 8px;
-  padding: 10px;
-  width: 100%;
-  margin-top: 15px;
-  color: #666;
-  font-weight: bold;
-}
-
-/* UKŁAD POZOSTAŁYCH ĆWICZEŃ */
-.other-exercise-wrapper {
-  display: flex;
-  gap: 15px;
-  align-items: center;
-}
-.other-exercise-inputs {
-  flex-grow: 1;
-  display: flex;
-  gap: 15px;
 }
 
 /* PRZYCISKI AKCJI */
@@ -716,14 +418,6 @@ export default defineComponent({
   margin: 0;
   color: #777;
   font-style: italic;
-}
-.icon-button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 50%;
-  display: flex;
 }
 .loading-container {
   display: flex;

@@ -23,22 +23,17 @@ const options: PluginOptions = {
   rtl: false,
 };
 
-let app: any; // Zmienna do przechowywania instancji aplikacji
+let app: any;
 
-// onAuthStateChanged to centralny punkt zarządzania autoryzacją.
-// Uruchamia się raz przy starcie aplikacji oraz za każdym razem, gdy użytkownik się loguje lub wylogowuje.
 onAuthStateChanged(auth, async (user) => {
-  // Inicjalizuj i zamontuj aplikację tylko raz - przy pierwszym uruchomieniu onAuthStateChanged.
   if (!app) {
     if (user) {
-      // Jeśli przy starcie jest zalogowany użytkownik, zaktualizuj store PRZED utworzeniem aplikacji
       store.commit("SET_USER", { uid: user.uid, email: user.email });
       await store.dispatch("fetchUserData");
+      await store.dispatch("initializeTrainingStateFromCache");
     }
-    // Oznacz, że autoryzacja jest gotowa, aby ukryć ekrany ładowania
     store.commit("SET_AUTH_IS_READY", true);
 
-    // Stwórz i zamontuj aplikację
     app = createApp(App).use(store).use(router).use(Toast, options);
     app.mount("#app");
   }

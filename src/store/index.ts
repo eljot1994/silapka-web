@@ -241,13 +241,12 @@ const store = createStore<State>({
     },
     SET_TRAINING_ACTIVE(state, status: boolean) {
       state.isTrainingActive = status;
-      if (status) {
-        if (state.trainingStartTime === null) {
-          state.trainingStartTime = Date.now();
-        }
-      } else {
+      if (!status) {
         state.trainingStartTime = null;
       }
+    },
+    SET_TRAINING_START_TIME(state, time: number | null) {
+      state.trainingStartTime = time;
     },
     SET_TRAINING_TEMPLATES(state, templates: TrainingTemplate[]) {
       state.trainingTemplates = templates;
@@ -299,6 +298,26 @@ const store = createStore<State>({
   },
 
   actions: {
+    initializeTrainingStateFromCache({ commit, dispatch, state }) {
+      const startTime = localStorage.getItem("trainingStartTime");
+      const isPaused = localStorage.getItem("isTrainingPaused") === "true";
+
+      if (
+        startTime &&
+        !isNaN(Number(startTime)) &&
+        state.currentTraining.length > 0
+      ) {
+        commit("SET_TRAINING_START_TIME", Number(startTime));
+        commit("SET_TRAINING_PAUSED", isPaused);
+        commit("SET_TRAINING_ACTIVE", true);
+
+        if (!isPaused) {
+          dispatch("startTrainingTimer");
+        } else {
+          dispatch("updateTrainingTime");
+        }
+      }
+    },
     startRestTimer({ commit, dispatch, state }, duration?: number) {
       const restTime = duration ?? state.userSettings.restDuration;
       dispatch("stopRestTimer");
@@ -316,6 +335,14 @@ const store = createStore<State>({
     stopRestTimer({ commit }) {
       commit("CLEAR_REST_TIMER_INTERVAL");
       commit("SET_REST_TIMER_ACTIVE", false);
+    },
+    cancelTraining({ commit, dispatch }) {
+      dispatch("stopTrainingTimer");
+      commit("SET_TRAINING_PAUSED", false);
+      commit("SET_TRAINING_ACTIVE", false); // To również resetuje `trainingStartTime`
+      commit("SET_TRAINING_TIME", "00:00:00");
+      localStorage.removeItem("trainingStartTime");
+      localStorage.removeItem("isTrainingPaused");
     },
     updateTrainingTime({ commit, state }) {
       const startTime = state.trainingStartTime;
@@ -344,14 +371,22 @@ const store = createStore<State>({
       commit("CLEAR_TRAINING_TIMER_INTERVAL");
     },
     startTraining({ commit, dispatch }) {
+      const startTime = Date.now();
+      localStorage.setItem("trainingStartTime", String(startTime));
+      localStorage.setItem("isTrainingPaused", "false");
+
+      commit("SET_TRAINING_START_TIME", startTime);
       commit("SET_TRAINING_ACTIVE", true);
+      commit("SET_TRAINING_PAUSED", false);
       dispatch("startTrainingTimer");
     },
     pauseTraining({ commit, dispatch }) {
+      localStorage.setItem("isTrainingPaused", "true");
       commit("SET_TRAINING_PAUSED", true);
       dispatch("stopTrainingTimer");
     },
     resumeTraining({ commit, dispatch }) {
+      localStorage.setItem("isTrainingPaused", "false");
       commit("SET_TRAINING_PAUSED", false);
       dispatch("startTrainingTimer");
     },
@@ -384,6 +419,8 @@ const store = createStore<State>({
     },
     async logout({ commit, dispatch }) {
       await signOut(auth);
+      localStorage.removeItem("trainingStartTime");
+      localStorage.removeItem("isTrainingPaused");
       dispatch("stopTrainingTimer");
       commit("SET_TRAINING_PAUSED", false);
       commit("SET_USER", null);
@@ -440,14 +477,10 @@ const store = createStore<State>({
     async updateExerciseType({ commit, state }, updatedType: ExerciseType) {
       if (state.currentUser) {
         const userRef = doc(db, "users", state.currentUser.uid);
-
-        // Znajdź starą wersję obiektu do usunięcia
         const oldType = state.exerciseTypes.find(
           (t) => t.id === updatedType.id
         );
-
         if (oldType) {
-          // Usuń stary obiekt i dodaj nowy w jednej operacji
           await updateDoc(userRef, {
             exerciseTypes: arrayRemove(removeUndefined(oldType)),
           });
@@ -455,7 +488,6 @@ const store = createStore<State>({
             exerciseTypes: arrayUnion(removeUndefined(updatedType)),
           });
         }
-
         commit("UPDATE_EXERCISE_TYPE", updatedType);
       }
     },
@@ -711,6 +743,9 @@ const store = createStore<State>({
           exerciseTypes: removeUndefined(updatedExerciseTypes),
           lastTrainedParties: removeUndefined(newLastTrainedParties),
         });
+
+        localStorage.removeItem("trainingStartTime");
+        localStorage.removeItem("isTrainingPaused");
 
         commit("ADD_TRAINING_TO_HISTORY", completedTraining);
         commit("SET_EXERCISE_TYPES", updatedExerciseTypes);
