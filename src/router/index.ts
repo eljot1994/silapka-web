@@ -11,6 +11,7 @@ import StatsView from "../views/StatsView.vue";
 import ProfileView from "../views/ProfileView.vue";
 import ProfileSettingsView from "../views/ProfileSettingsView.vue";
 import store from "../store";
+import TrainingSummaryView from "../views/TrainingSummaryView.vue";
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -47,6 +48,12 @@ const routes: Array<RouteRecordRaw> = [
     path: "/history",
     name: "history",
     component: HistoryView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/summary/:id", // :id to dynamiczny parametr
+    name: "training-summary",
+    component: TrainingSummaryView,
     meta: { requiresAuth: true },
   },
   {

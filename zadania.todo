@@ -9,14 +9,14 @@
   ☐ Rozważyć zmianę struktury danych dla `exerciseTypes` i `trainingTemplates` z tablicy na mapę (obiekt z kluczem ID) w celu optymalizacji operacji CRUD
 
 ### Refaktoryzacja i Unikanie Powtórzeń (DRY) @refactor
-  ☐ Stworzyć jeden reużywalny komponent `TrainingListView.vue` zamiast duplikować kod w `HistoryView.vue` i `TemplatesView.vue`
+  ✔ Stworzyć jeden reużywalny komponent `TrainingListView.vue` zamiast duplikować kod w `HistoryView.vue` i `TemplatesView.vue` @done(25-08-15 18:07)
   ✔ Stworzyć reużywalny komponent `BackButton.vue` @done(25-08-15 16:46)
   ✔ Przenieść logikę walidacji z `HomeView.vue` do osobnego pliku `composables/useValidation.ts` @done(25-08-15 17:03)
   ✔ Przenieść funkcję `parseDate` do pliku z funkcjami pomocniczymi `utils/date.ts` @done(25-08-15 16:46)
 
 ### Usprawnienia w Logice Komponentów @refactor @vue
-  ☐ Podzielić komponent `WelcomeView.vue` na mniejsze: `ExerciseCard.vue` (dla pojedynczego ćwiczenia) i `TrainingControls.vue` (dla przycisków start/pauza/koniec)
-  ☐ Wydzielić logikę timera treningu z `WelcomeView.vue` do composable'a `useTrainingTimer.ts`
+  ✔ Podzielić komponent `WelcomeView.vue` na mniejsze: `ExerciseCard.vue` (dla pojedynczego ćwiczenia) i `TrainingControls.vue` (dla przycisków start/pauza/koniec) @done(25-08-15 18:07)
+  ✔ Wydzielić logikę timera treningu z `WelcomeView.vue` do composable'a `useTrainingTimer.ts` @done(25-08-15 18:07)
 
 ### Drobne Poprawki @ux @bug
   ✔ Poprawić tytuł w `TemplatesView.vue` z "Historia Treningów" na "Szablony Treningów" @done(25-08-15 16:46)

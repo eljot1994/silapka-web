@@ -52,7 +52,8 @@
             type="email"
             placeholder="Email"
             v-model="signupForm.email"
-            @blur="validateEmail"
+            @blur="handleBlur('email')"
+            @input="handleInput('email')"
             required
           />
           <p v-if="signupErrors.email" class="validation-error">
@@ -64,7 +65,8 @@
             type="password"
             placeholder="Hasło"
             v-model="signupForm.password"
-            @blur="validatePassword"
+            @blur="handleBlur('password')"
+            @input="handleInput('password')"
             required
           />
           <p v-if="signupErrors.password" class="validation-error">
@@ -76,7 +78,8 @@
             type="password"
             placeholder="Potwierdź hasło"
             v-model="signupForm.confirmPassword"
-            @blur="validateConfirmPassword"
+            @blur="handleBlur('confirmPassword')"
+            @input="handleInput('confirmPassword')"
             required
           />
           <p v-if="signupErrors.confirmPassword" class="validation-error">
@@ -100,6 +103,8 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useValidation } from "@/composables/useValidation";
 
+type ValidationField = "email" | "password" | "confirmPassword";
+
 export default defineComponent({
   name: "HomeView",
   setup() {
@@ -121,6 +126,13 @@ export default defineComponent({
       confirmPassword: "",
     });
 
+    // Śledzi, czy pole zostało już "dotknięte" przez użytkownika
+    const formBlurred = reactive({
+      email: false,
+      password: false,
+      confirmPassword: false,
+    });
+
     const {
       signupErrors,
       validateEmail,
@@ -129,6 +141,27 @@ export default defineComponent({
       isSignupFormValid,
     } = useValidation(signupForm);
 
+    // Funkcja wywoływana po opuszczeniu pola
+    const handleBlur = (field: ValidationField) => {
+      formBlurred[field] = true;
+      // Uruchom walidację od razu po pierwszym opuszczeniu pola
+      if (field === "email") validateEmail();
+      if (field === "password") validatePassword();
+      if (field === "confirmPassword") validateConfirmPassword();
+    };
+
+    // Funkcja wywoływana przy każdym wpisanym znaku
+    const handleInput = (field: ValidationField) => {
+      // Uruchom walidację tylko, jeśli pole było już wcześniej opuszczone
+      if (formBlurred[field]) {
+        if (field === "email") validateEmail();
+        if (field === "password") validatePassword();
+        if (field === "confirmPassword") validateConfirmPassword();
+      }
+    };
+
+    // wewnątrz setup() w src/views/HomeView.vue
+
     const handleLogin = async () => {
       authError.value = null;
       isLoading.value = true;
@@ -136,7 +169,23 @@ export default defineComponent({
         await store.dispatch("login", loginForm.value);
         router.push({ name: "welcome" });
       } catch (error: any) {
-        authError.value = "Nie udało się zalogować. Sprawdź email i hasło.";
+        // Rozszerzona obsługa błędów
+        switch (error.code) {
+          case "auth/user-not-found":
+            authError.value =
+              "Nie znaleziono użytkownika o podanym adresie email.";
+            break;
+          case "auth/wrong-password":
+            authError.value = "Nieprawidłowe hasło. Spróbuj ponownie.";
+            break;
+          case "auth/invalid-credential":
+            authError.value =
+              "Nieprawidłowe dane logowania. Sprawdź email i hasło.";
+            break;
+          default:
+            authError.value = "Wystąpił błąd podczas logowania.";
+            break;
+        }
       } finally {
         isLoading.value = false;
       }
@@ -147,14 +196,12 @@ export default defineComponent({
       if (isSignupFormValid()) {
         isLoading.value = true;
         try {
-          // --- POPRAWKA TUTAJ ---
           await store.dispatch("signup", {
             email: signupForm.email,
             password: signupForm.password,
           });
-          // --- KONIEC POPRAWKI ---
           router.push({ name: "welcome" });
-        } catch (error: any) {
+        } catch (error) {
           authError.value = "Nie udało się zarejestrować. Spróbuj ponownie.";
         } finally {
           isLoading.value = false;
@@ -171,15 +218,15 @@ export default defineComponent({
       signupErrors,
       handleLogin,
       handleSignup,
-      validateEmail,
-      validatePassword,
-      validateConfirmPassword,
+      handleBlur,
+      handleInput,
     };
   },
 });
 </script>
 
 <style scoped>
+/* Style pozostają bez zmian */
 .spinner {
   display: inline-block;
   width: 20px;

@@ -264,9 +264,18 @@ export default defineComponent({
     const finishTraining = async () => {
       if (confirm("Czy na pewno chcesz zakończyć trening?")) {
         try {
-          await store.dispatch("finishCurrentTraining");
-          toast.success("Trening zakończony i zapisany!");
-          router.push({ name: "history" });
+          // Teraz funkcja zwraca ukończony trening
+          const completedTraining = await store.dispatch(
+            "finishCurrentTraining"
+          );
+          if (completedTraining) {
+            toast.success("Trening zakończony i zapisany!");
+            // Używamy ID z zwróconego obiektu do przekierowania
+            router.push({
+              name: "training-summary",
+              params: { id: completedTraining.id },
+            });
+          }
         } catch (e: unknown) {
           const error = e as Error;
           toast.error(

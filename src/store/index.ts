@@ -98,10 +98,10 @@ interface State {
   lastTrainedParties: LastTrainedParties;
   isRestTimerActive: boolean;
   restTimerSeconds: number;
-  restTimerInterval: number | null;
+  restTimerInterval: ReturnType<typeof setInterval> | null; // Poprawka typowania
   isTrainingPaused: boolean;
   trainingTime: string;
-  trainingTimerInterval: number | null;
+  trainingTimerInterval: ReturnType<typeof setInterval> | null; // Poprawka typowania
   userSettings: UserSettings;
 }
 
@@ -268,7 +268,10 @@ const store = createStore<State>({
     SET_REST_TIMER_SECONDS(state, seconds: number) {
       state.restTimerSeconds = seconds;
     },
-    SET_REST_TIMER_INTERVAL(state, interval: number | null) {
+    SET_REST_TIMER_INTERVAL(
+      state,
+      interval: ReturnType<typeof setInterval> | null
+    ) {
       state.restTimerInterval = interval;
     },
     CLEAR_REST_TIMER_INTERVAL(state) {
@@ -283,7 +286,10 @@ const store = createStore<State>({
     SET_TRAINING_TIME(state, time: string) {
       state.trainingTime = time;
     },
-    SET_TRAINING_TIMER_INTERVAL(state, interval: number | null) {
+    SET_TRAINING_TIMER_INTERVAL(
+      state,
+      interval: ReturnType<typeof setInterval> | null
+    ) {
       state.trainingTimerInterval = interval;
     },
     CLEAR_TRAINING_TIMER_INTERVAL(state) {
@@ -330,19 +336,11 @@ const store = createStore<State>({
           dispatch("stopRestTimer");
         }
       }, 1000);
-      commit("SET_REST_TIMER_INTERVAL", interval as any);
+      commit("SET_REST_TIMER_INTERVAL", interval);
     },
     stopRestTimer({ commit }) {
       commit("CLEAR_REST_TIMER_INTERVAL");
       commit("SET_REST_TIMER_ACTIVE", false);
-    },
-    cancelTraining({ commit, dispatch }) {
-      dispatch("stopTrainingTimer");
-      commit("SET_TRAINING_PAUSED", false);
-      commit("SET_TRAINING_ACTIVE", false); // To również resetuje `trainingStartTime`
-      commit("SET_TRAINING_TIME", "00:00:00");
-      localStorage.removeItem("trainingStartTime");
-      localStorage.removeItem("isTrainingPaused");
     },
     updateTrainingTime({ commit, state }) {
       const startTime = state.trainingStartTime;
@@ -365,7 +363,7 @@ const store = createStore<State>({
       const interval = setInterval(() => {
         dispatch("updateTrainingTime");
       }, 1000);
-      commit("SET_TRAINING_TIMER_INTERVAL", interval as any);
+      commit("SET_TRAINING_TIMER_INTERVAL", interval);
     },
     stopTrainingTimer({ commit }) {
       commit("CLEAR_TRAINING_TIMER_INTERVAL");
@@ -390,6 +388,14 @@ const store = createStore<State>({
       commit("SET_TRAINING_PAUSED", false);
       dispatch("startTrainingTimer");
     },
+    cancelTraining({ commit, dispatch }) {
+      dispatch("stopTrainingTimer");
+      commit("SET_TRAINING_PAUSED", false);
+      commit("SET_TRAINING_ACTIVE", false);
+      commit("SET_TRAINING_TIME", "00:00:00");
+      localStorage.removeItem("trainingStartTime");
+      localStorage.removeItem("isTrainingPaused");
+    },
     async signup({ commit }, { email, password }) {
       const res = await createUserWithEmailAndPassword(auth, email, password);
       if (res.user) {
@@ -409,6 +415,7 @@ const store = createStore<State>({
         throw new Error("Could not complete signup");
       }
     },
+    // --- POPRAWIONA AKCJA LOGIN ---
     async login({ commit }, { email, password }) {
       const res = await signInWithEmailAndPassword(auth, email, password);
       if (res.user) {
@@ -560,7 +567,9 @@ const store = createStore<State>({
         if (index !== -1) {
           currentTrainingCopy[index] = updatedExercise;
           const cleanedCurrentTraining = removeUndefined(currentTrainingCopy);
-          await updateDoc(userRef, { currentTraining: cleanedCurrentTraining });
+          await updateDoc(userRef, {
+            currentTraining: cleanedCurrentTraining,
+          });
           commit("SET_CURRENT_TRAINING", currentTrainingCopy);
         }
       }
@@ -755,7 +764,12 @@ const store = createStore<State>({
         dispatch("stopTrainingTimer");
         commit("SET_TRAINING_PAUSED", false);
         commit("SET_TRAINING_ACTIVE", false);
+
+        // Zwracamy ukończony trening, aby WelcomeView mogło użyć jego ID do przekierowania
+        return completedTraining;
       }
+      // Dodajemy return, aby uniknąć błędu "not all code paths return a value"
+      return null;
     },
     async deleteTrainingFromHistory({ commit, state }, trainingId: string) {
       if (state.currentUser) {
