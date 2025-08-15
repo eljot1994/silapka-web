@@ -21,19 +21,16 @@ interface User {
   email: string;
   name?: string;
 }
-
 export type ExerciseCategory =
   | "strength"
   | "cardio"
   | "flexibility"
   | "recovery";
-
 export interface SessionSet {
   weight: number | null;
   reps: number | null;
   done: boolean;
 }
-
 export interface ExerciseType {
   id: string;
   name: string;
@@ -46,14 +43,12 @@ export interface ExerciseType {
   lastUsedDuration?: number | null;
   lastUsedReps?: number | null;
 }
-
 export interface Set {
   id: string;
   weight: number | null;
   reps: number | null;
   done: boolean;
 }
-
 export interface PlannedExercise {
   id: string;
   exerciseTypeId: string;
@@ -64,28 +59,23 @@ export interface PlannedExercise {
   duration?: number | null;
   reps?: number | null;
 }
-
 export interface TrainingRecord {
   id: string;
   date: string;
   duration: string;
   exercises: PlannedExercise[];
 }
-
 export interface TrainingTemplate {
   id: string;
   name: string;
   exercises: PlannedExercise[];
 }
-
 export interface LastTrainedParties {
   [party: string]: number;
 }
-
 interface UserSettings {
   restDuration: number;
 }
-
 interface State {
   currentUser: User | null;
   authIsReady: boolean;
@@ -98,10 +88,10 @@ interface State {
   lastTrainedParties: LastTrainedParties;
   isRestTimerActive: boolean;
   restTimerSeconds: number;
-  restTimerInterval: ReturnType<typeof setInterval> | null; // Poprawka typowania
+  restTimerInterval: ReturnType<typeof setInterval> | null;
   isTrainingPaused: boolean;
   trainingTime: string;
-  trainingTimerInterval: ReturnType<typeof setInterval> | null; // Poprawka typowania
+  trainingTimerInterval: ReturnType<typeof setInterval> | null;
   userSettings: UserSettings;
 }
 
@@ -415,7 +405,6 @@ const store = createStore<State>({
         throw new Error("Could not complete signup");
       }
     },
-    // --- POPRAWIONA AKCJA LOGIN ---
     async login({ commit }, { email, password }) {
       const res = await signInWithEmailAndPassword(auth, email, password);
       if (res.user) {
@@ -765,10 +754,8 @@ const store = createStore<State>({
         commit("SET_TRAINING_PAUSED", false);
         commit("SET_TRAINING_ACTIVE", false);
 
-        // Zwracamy ukończony trening, aby WelcomeView mogło użyć jego ID do przekierowania
         return completedTraining;
       }
-      // Dodajemy return, aby uniknąć błędu "not all code paths return a value"
       return null;
     },
     async deleteTrainingFromHistory({ commit, state }, trainingId: string) {

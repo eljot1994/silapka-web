@@ -94,11 +94,11 @@
 import { defineComponent, computed, onUnmounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { PlannedExercise, Set } from "@/store";
+import { PlannedExercise, Set, TrainingRecord } from "@/store";
 import { useToast } from "vue-toastification";
 import ExerciseCard from "@/components/ExerciseCard.vue";
 import TrainingControls from "@/components/TrainingControls.vue";
-import { useTrainingTimer } from "@/composables/useTrainingTimer"; // 1. Import nowej logiki
+import { useTrainingTimer } from "@/composables/useTrainingTimer";
 
 export default defineComponent({
   name: "WelcomeView",
@@ -111,7 +111,6 @@ export default defineComponent({
     const router = useRouter();
     const toast = useToast();
 
-    // 2. Wykorzystanie composable'a do zarządzania timerem
     const {
       isTrainingActive,
       isTrainingPaused,
@@ -121,7 +120,6 @@ export default defineComponent({
       resumeTraining,
     } = useTrainingTimer();
 
-    // Pozostałe właściwości i funkcje, które nie są związane z timerem
     const authIsReady = computed(() => store.getters.authIsReady);
     const userEmail = computed(
       () => store.getters.currentUser?.email || "Gościu"
@@ -131,16 +129,6 @@ export default defineComponent({
     );
     const isRestTimerActive = computed(() => store.getters.isRestTimerActive);
     const restTimerSeconds = computed(() => store.getters.restTimerSeconds);
-
-    const handleCancelTraining = () => {
-      if (
-        confirm(
-          "Czy na pewno chcesz anulować ten trening? Postęp nie zostanie zapisany, a licznik zostanie zresetowany."
-        )
-      ) {
-        store.dispatch("cancelTraining");
-      }
-    };
 
     onUnmounted(() => {
       store.dispatch("stopRestTimer");
@@ -264,13 +252,11 @@ export default defineComponent({
     const finishTraining = async () => {
       if (confirm("Czy na pewno chcesz zakończyć trening?")) {
         try {
-          // Teraz funkcja zwraca ukończony trening
-          const completedTraining = await store.dispatch(
+          const completedTraining: TrainingRecord | null = await store.dispatch(
             "finishCurrentTraining"
           );
           if (completedTraining) {
             toast.success("Trening zakończony i zapisany!");
-            // Używamy ID z zwróconego obiektu do przekierowania
             router.push({
               name: "training-summary",
               params: { id: completedTraining.id },
@@ -282,6 +268,16 @@ export default defineComponent({
             error.message || "Wystąpił błąd podczas kończenia treningu."
           );
         }
+      }
+    };
+
+    const handleCancelTraining = () => {
+      if (
+        confirm(
+          "Czy na pewno chcesz anulować ten trening? Postęp nie zostanie zapisany, a licznik zostanie zresetowany."
+        )
+      ) {
+        store.dispatch("cancelTraining");
       }
     };
 
@@ -304,7 +300,6 @@ export default defineComponent({
       isRestTimerActive,
       restTimerSeconds,
       isTrainingPaused,
-      handleCancelTraining,
       startTraining,
       pauseTraining,
       resumeTraining,
@@ -319,6 +314,7 @@ export default defineComponent({
       finishTraining,
       goToAddExercise,
       saveAsTemplate,
+      handleCancelTraining,
     };
   },
 });
@@ -367,14 +363,6 @@ export default defineComponent({
   padding: 0;
   margin-top: 20px;
 }
-
-/* PRZYCISKI AKCJI */
-.main-actions-bar {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 20px;
-}
 .action-button {
   width: 100%;
   padding: 12px 20px;
@@ -390,21 +378,9 @@ export default defineComponent({
   gap: 8px;
   height: 50px;
 }
-.action-button.primary {
-  background-color: #42b983;
-  color: white;
-}
 .action-button.secondary {
   background-color: #007bff;
   color: white;
-}
-.action-button.danger {
-  background-color: #dc3545;
-  color: white;
-}
-.action-button.warning {
-  background-color: #ffc107;
-  color: #212529;
 }
 .full-width-button,
 .save-template-button {
