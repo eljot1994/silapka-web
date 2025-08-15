@@ -1,56 +1,32 @@
 <template>
-  <div class="view-container">
-    <BackButton :to="{ name: 'profile' }" text="Wróć do profilu" />
-    <h1>Szablony Treningów</h1>
-
-    <div class="templates-section">
-      <div v-if="allTrainingTemplates.length === 0" class="info-message">
-        <p>Brak zapisanych szablonów.</p>
-        <p class="info-details">
-          Aby dodać nowy szablon, przygotuj listę ćwiczeń na stronie głównej, a
-          następnie użyj opcji "Zapisz jako szablon".
-        </p>
+  <TrainingListView
+    title="Szablony Treningów"
+    :items="allTrainingTemplates"
+    empty-message="Brak zapisanych szablonów."
+    empty-details="Aby dodać nowy szablon, przygotuj listę ćwiczeń na stronie głównej, a następnie użyj opcji 'Zapisz jako szablon'."
+  >
+    <template #item-header="{ item }">
+      <h4 class="template-title">{{ item.name }}</h4>
+      <div>
+        <button @click="loadTemplate(item.id)" class="action-button primary">
+          Wczytaj
+        </button>
+        <button @click="deleteTemplate(item.id)" class="action-button danger">
+          Usuń
+        </button>
       </div>
+    </template>
 
-      <ul v-else class="template-list">
-        <li
-          v-for="template in allTrainingTemplates"
-          :key="template.id"
-          class="template-item"
-        >
-          <div class="template-header">
-            <h4>{{ template.name }}</h4>
-            <div>
-              <button
-                @click="loadTemplate(template.id)"
-                class="action-button primary"
-              >
-                Wczytaj
-              </button>
-              <button
-                @click="deleteTemplate(template.id)"
-                class="action-button danger"
-              >
-                Usuń
-              </button>
-            </div>
-          </div>
-          <p class="exercises-summary">
-            Zaplanowane ćwiczenia ({{ template.exercises.length }}):
-          </p>
-          <ul class="exercise-summary-list">
-            <li
-              v-for="exercise in template.exercises"
-              :key="exercise.id"
-              class="exercise-summary-item"
-            >
-              <span class="exercise-name-summary">{{ exercise.name }}</span>
-            </li>
-          </ul>
-        </li>
-      </ul>
-    </div>
-  </div>
+    <template #exercise-list="{ item }">
+      <li
+        v-for="exercise in item.exercises"
+        :key="exercise.id"
+        class="exercise-summary-item"
+      >
+        <span class="exercise-name-summary">{{ exercise.name }}</span>
+      </li>
+    </template>
+  </TrainingListView>
 </template>
 
 <script lang="ts">
@@ -59,19 +35,17 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { TrainingTemplate } from "@/store";
 import { useToast } from "vue-toastification";
-import BackButton from "@/components/BackButton.vue"; // 1. Import komponentu
+import TrainingListView from "@/components/TrainingListView.vue";
 
 export default defineComponent({
   name: "TemplatesView",
   components: {
-    BackButton, // 2. Zarejestrowanie komponentu
+    TrainingListView,
   },
   setup() {
     const store = useStore();
     const router = useRouter();
     const toast = useToast();
-
-    // 3. Usunięto funkcję goBackToProfile, bo jest już w komponencie
 
     const allTrainingTemplates = computed<TrainingTemplate[]>(() =>
       [...store.getters.allTrainingTemplates].sort((a, b) =>
@@ -108,60 +82,13 @@ export default defineComponent({
 </script>
 
 <style scoped>
-.view-container {
-  padding: 20px;
-  text-align: center;
-  max-width: 600px;
-  margin: 0 auto;
-  position: relative;
+/* Używamy :deep() aby styl dotarł do komponentu potomnego */
+:deep(.list-item) {
+  background-color: #e3f2fd; /* Niebieskie tło */
+  border-color: #bbdefb;
 }
-/* Stary styl dla .back-button można teraz usunąć, 
-   ponieważ komponent ma swoje własne style */
-h1 {
-  color: #2c3e50;
-  margin-bottom: 30px;
-  font-size: 2em;
-}
-.templates-section {
-  background-color: #ffffff;
-  padding: 25px;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  text-align: left;
-}
-.info-message {
-  text-align: center;
-  color: #777;
-  font-style: italic;
-  padding: 20px;
-  background-color: #f8f9fa;
-  border-radius: 8px;
-}
-.info-details {
-  margin-top: 10px;
-  font-style: normal;
-  font-size: 0.9em;
-  color: #555;
-}
-.template-list {
-  list-style: none;
-  padding: 0;
-}
-.template-item {
-  background-color: #e9e9f5;
-  border: 1px solid #c8c8e6;
-  border-radius: 8px;
-  padding: 15px;
-  margin-bottom: 20px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-}
-.template-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-.template-header h4 {
+
+.template-title {
   margin: 0;
   font-size: 1.5em;
   color: #007bff;
@@ -179,17 +106,6 @@ h1 {
 }
 .action-button.danger {
   background-color: #dc3545;
-}
-.exercises-summary {
-  font-weight: bold;
-  margin-top: 15px;
-  margin-bottom: 10px;
-}
-.exercise-summary-list {
-  list-style: none;
-  padding-left: 0;
-  border-left: 2px solid #ccc;
-  margin-left: 10px;
 }
 .exercise-summary-item {
   margin-bottom: 5px;

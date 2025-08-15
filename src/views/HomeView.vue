@@ -28,7 +28,6 @@
             type="email"
             placeholder="Email"
             v-model="loginForm.email"
-            x
             required
           />
         </div>
@@ -96,9 +95,10 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, reactive } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import { useValidation } from "@/composables/useValidation";
 
 export default defineComponent({
   name: "HomeView",
@@ -115,66 +115,20 @@ export default defineComponent({
       password: "",
     });
 
-    const signupForm = ref({
+    const signupForm = reactive({
       email: "",
       password: "",
       confirmPassword: "",
     });
 
-    const signupErrors = ref({
-      email: "",
-      password: "",
-      confirmPassword: "",
-    });
+    const {
+      signupErrors,
+      validateEmail,
+      validatePassword,
+      validateConfirmPassword,
+      isSignupFormValid,
+    } = useValidation(signupForm);
 
-    // --- Funkcje Walidacji ---
-    const validateEmail = () => {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!signupForm.value.email) {
-        signupErrors.value.email = "Email jest wymagany.";
-      } else if (!emailRegex.test(signupForm.value.email)) {
-        signupErrors.value.email = "Niepoprawny format email.";
-      } else {
-        signupErrors.value.email = "";
-      }
-    };
-
-    const validatePassword = () => {
-      if (!signupForm.value.password) {
-        signupErrors.value.password = "Hasło jest wymagane.";
-      } else if (signupForm.value.password.length < 6) {
-        signupErrors.value.password = "Hasło musi mieć co najmniej 6 znaków.";
-      } else {
-        signupErrors.value.password = "";
-      }
-      validateConfirmPassword();
-    };
-
-    const validateConfirmPassword = () => {
-      if (!signupForm.value.confirmPassword) {
-        signupErrors.value.confirmPassword =
-          "Potwierdzenie hasła jest wymagane.";
-      } else if (
-        signupForm.value.password !== signupForm.value.confirmPassword
-      ) {
-        signupErrors.value.confirmPassword = "Hasła nie są identyczne.";
-      } else {
-        signupErrors.value.confirmPassword = "";
-      }
-    };
-
-    const isSignupFormValid = () => {
-      validateEmail();
-      validatePassword();
-      validateConfirmPassword();
-      return (
-        !signupErrors.value.email &&
-        !signupErrors.value.password &&
-        !signupErrors.value.confirmPassword
-      );
-    };
-
-    // --- Obsługa formularzy z przekierowaniem ---
     const handleLogin = async () => {
       authError.value = null;
       isLoading.value = true;
@@ -193,10 +147,12 @@ export default defineComponent({
       if (isSignupFormValid()) {
         isLoading.value = true;
         try {
+          // --- POPRAWKA TUTAJ ---
           await store.dispatch("signup", {
-            email: signupForm.value.email,
-            password: signupForm.value.password,
+            email: signupForm.email,
+            password: signupForm.password,
           });
+          // --- KONIEC POPRAWKI ---
           router.push({ name: "welcome" });
         } catch (error: any) {
           authError.value = "Nie udało się zarejestrować. Spróbuj ponownie.";

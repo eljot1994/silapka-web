@@ -1,97 +1,60 @@
 <template>
-  <div class="view-container">
-    <BackButton :to="{ name: 'profile' }" text="Wróć do profilu" />
-    <h1>Historia Treningów</h1>
+  <TrainingListView
+    title="Historia Treningów"
+    :items="sortedTrainingHistory"
+    empty-message="Brak zapisanych treningów w historii."
+  >
+    <template #item-header="{ item }">
+      <h4 class="history-title">
+        Trening z dnia:
+        <span class="training-date">{{ item.date }}</span>
+        <br />
+        <small class="training-duration">
+          Czas trwania: {{ item.duration || "N/A" }}
+        </small>
+      </h4>
+      <button @click="deleteTraining(item.id)" class="delete-button">
+        Usuń
+      </button>
+    </template>
 
-    <div class="history-section">
-      <p v-if="sortedTrainingHistory.length === 0" class="info-message">
-        Brak zapisanych treningów w historii.
-      </p>
-
-      <ul v-else class="training-list">
-        <li
-          v-for="training in sortedTrainingHistory"
-          :key="training.id"
-          class="training-item"
+    <template #exercise-list="{ item }">
+      <li
+        v-for="exercise in item.exercises"
+        :key="exercise.id"
+        class="exercise-summary-item"
+      >
+        <span class="exercise-name-summary">{{ exercise.name }}</span>
+        <span
+          v-if="exercise.category === 'strength' && exercise.sets"
+          class="exercise-details-summary"
         >
-          <div class="training-header">
-            <h4>
-              Trening z dnia:
-              <span class="training-date">{{ training.date }}</span>
-              <br />
-              <small class="training-duration"
-                >Czas trwania: {{ training.duration || "N/A" }}</small
-              >
-            </h4>
-            <button @click="deleteTraining(training.id)" class="delete-button">
-              Usuń
-            </button>
-          </div>
-          <p class="exercises-summary">
-            Wykonane ćwiczenia ({{ training.exercises.length }}):
-          </p>
-          <ul class="exercise-summary-list">
-            <li
-              v-for="exercise in training.exercises"
-              :key="exercise.id"
-              class="exercise-summary-item"
-            >
-              <span class="exercise-name-summary">{{ exercise.name }}</span>
-              <span
-                v-if="exercise.category === 'strength' && exercise.sets"
-                class="exercise-details-summary"
-              >
-                <span v-for="(set, index) in exercise.sets" :key="set.id">
-                  {{ index + 1 }}. {{ set.weight || 0 }}kg x
-                  {{ set.reps || 0 }} powt.
-                  {{ set.done ? "(wyk.)" : "(niewyk.)" }}<br />
-                </span>
-              </span>
-              <span
-                v-else-if="exercise.category === 'cardio'"
-                class="exercise-details-summary"
-              >
-                {{ exercise.duration }} min.
-                {{ exercise.done ? "(wyk.)" : "(niewyk.)" }}
-              </span>
-              <span
-                v-else-if="exercise.category === 'flexibility'"
-                class="exercise-details-summary"
-              >
-                <span v-if="exercise.reps"
-                  >Powtórzenia: {{ exercise.reps }}</span
-                >
-                <span v-if="exercise.duration"
-                  >Długość: {{ exercise.duration }} min.</span
-                >
-                {{ exercise.done ? "(wyk.)" : "(niewyk.)" }}
-              </span>
-              <span
-                v-else-if="exercise.category === 'recovery'"
-                class="exercise-details-summary"
-              >
-                {{ exercise.duration }} min.
-                {{ exercise.done ? "(wyk.)" : "(niewyk.)" }}
-              </span>
-            </li>
-          </ul>
-        </li>
-      </ul>
-    </div>
-  </div>
+          <span v-for="(set, index) in exercise.sets" :key="set.id">
+            {{ index + 1 }}. {{ set.weight || 0 }}kg x {{ set.reps || 0 }} powt.
+            {{ set.done ? "(wyk.)" : "(niewyk.)" }}<br />
+          </span>
+        </span>
+        <span v-else class="exercise-details-summary">
+          <span v-if="exercise.duration">{{ exercise.duration }} min. </span>
+          <span v-if="exercise.reps">Powtórzenia: {{ exercise.reps }}. </span>
+          {{ exercise.done ? "(wyk.)" : "(niewyk.)" }}
+        </span>
+      </li>
+    </template>
+  </TrainingListView>
 </template>
 
 <script lang="ts">
 import { defineComponent, computed } from "vue";
 import { useStore } from "vuex";
 import { TrainingRecord } from "@/store";
-import BackButton from "@/components/BackButton.vue";
 import { parseDate } from "@/utils/date";
+import TrainingListView from "@/components/TrainingListView.vue";
 
 export default defineComponent({
   name: "HistoryView",
   components: {
-    BackButton,
+    TrainingListView,
   },
   setup() {
     const store = useStore();
@@ -119,63 +82,13 @@ export default defineComponent({
 </script>
 
 <style scoped>
-/* Style pozostają takie same, usunięto tylko .back-button */
-.view-container {
-  padding: 20px;
-  text-align: center;
-  max-width: 600px;
-  margin: 0 auto;
-  position: relative;
+/* Używamy :deep() aby styl dotarł do komponentu potomnego */
+:deep(.list-item) {
+  background-color: #e8f5e9; /* Zielone tło */
+  border-color: #c8e6c9;
 }
-.training-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-.delete-button {
-  background-color: #dc3545;
-  color: white;
-  border: none;
-  padding: 5px 10px;
-  border-radius: 5px;
-  cursor: pointer;
-}
-.training-duration {
-  font-size: 0.7em;
-  color: #555;
-  font-weight: normal;
-}
-h1 {
-  color: #2c3e50;
-  margin-bottom: 30px;
-  font-size: 2em;
-}
-.history-section {
-  background-color: #ffffff;
-  padding: 25px;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  text-align: left;
-}
-.info-message {
-  text-align: center;
-  color: #777;
-  font-style: italic;
-}
-.training-list {
-  list-style: none;
-  padding: 0;
-}
-.training-item {
-  background-color: #e8f5e9;
-  border: 1px solid #c8e6c9;
-  border-radius: 8px;
-  padding: 15px;
-  margin-bottom: 20px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-}
-.training-header h4 {
+
+.history-title {
   margin: 0;
   font-size: 1.5em;
   color: #42b983;
@@ -188,16 +101,18 @@ h1 {
   padding: 4px 8px;
   border-radius: 4px;
 }
-.exercises-summary {
-  font-weight: bold;
-  margin-top: 15px;
-  margin-bottom: 10px;
+.training-duration {
+  font-size: 0.7em;
+  color: #555;
+  font-weight: normal;
 }
-.exercise-summary-list {
-  list-style: none;
-  padding-left: 0;
-  border-left: 2px solid #ccc;
-  margin-left: 10px;
+.delete-button {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 5px;
+  cursor: pointer;
 }
 .exercise-summary-item {
   margin-bottom: 10px;

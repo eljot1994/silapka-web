@@ -5,21 +5,21 @@
   ✔ Dodać `.env.local` do pliku `.gitignore` @done(25-08-15 16:17)
 
 ### Optymalizacja Operacji na Bazie Danych @performance @db
-  ☐ Zrefaktoryzować akcje Vuex (`updateExerciseType`, `deleteTrainingFromHistory`, `deleteTemplate`) tak, aby używały `arrayRemove` lub aktualizacji konkretnych pól zamiast nadpisywania całych tablic w Firestore
+  ✔ Zrefaktoryzować akcje Vuex (`updateExerciseType`, `deleteTrainingFromHistory`, `deleteTemplate`) tak, aby używały `arrayRemove` lub aktualizacji konkretnych pól zamiast nadpisywania całych tablic w Firestore @done(25-08-15 16:46)
   ☐ Rozważyć zmianę struktury danych dla `exerciseTypes` i `trainingTemplates` z tablicy na mapę (obiekt z kluczem ID) w celu optymalizacji operacji CRUD
 
 ### Refaktoryzacja i Unikanie Powtórzeń (DRY) @refactor
   ☐ Stworzyć jeden reużywalny komponent `TrainingListView.vue` zamiast duplikować kod w `HistoryView.vue` i `TemplatesView.vue`
-  ☐ Stworzyć reużywalny komponent `BackButton.vue`
-  ☐ Przenieść logikę walidacji z `HomeView.vue` do osobnego pliku `composables/useValidation.ts`
-  ☐ Przenieść funkcję `parseDate` do pliku z funkcjami pomocniczymi `utils/date.ts`
+  ✔ Stworzyć reużywalny komponent `BackButton.vue` @done(25-08-15 16:46)
+  ✔ Przenieść logikę walidacji z `HomeView.vue` do osobnego pliku `composables/useValidation.ts` @done(25-08-15 17:03)
+  ✔ Przenieść funkcję `parseDate` do pliku z funkcjami pomocniczymi `utils/date.ts` @done(25-08-15 16:46)
 
 ### Usprawnienia w Logice Komponentów @refactor @vue
   ☐ Podzielić komponent `WelcomeView.vue` na mniejsze: `ExerciseCard.vue` (dla pojedynczego ćwiczenia) i `TrainingControls.vue` (dla przycisków start/pauza/koniec)
   ☐ Wydzielić logikę timera treningu z `WelcomeView.vue` do composable'a `useTrainingTimer.ts`
 
 ### Drobne Poprawki @ux @bug
-  ☐ Poprawić tytuł w `TemplatesView.vue` z "Historia Treningów" na "Szablony Treningów"
+  ✔ Poprawić tytuł w `TemplatesView.vue` z "Historia Treningów" na "Szablony Treningów" @done(25-08-15 16:46)
   ☐ Ulepszyć walidację w `HomeView.vue` (np. uruchamiać przy `@input` po pierwszym `@blur`)
   ☐ Rozszerzyć obsługę błędów logowania o konkretne komunikaty z Firebase (np. złe hasło, brak użytkownika)
   ☐ Poprawić typowanie w akcjach Vuex `startRestTimer` i `startTrainingTimer` aby uniknąć `as any`
