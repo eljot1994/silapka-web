@@ -58,11 +58,13 @@
             </button>
             <div class="set-inputs">
               <div class="input-group">
-                <label :for="`weight-${set.id}`">Ciężar (kg)</label>
+                <label :for="`weight-${set.id}`"
+                  >Ciężar ({{ weightUnitLabel }})</label
+                >
                 <input
                   :id="`weight-${set.id}`"
                   type="number"
-                  :value="set.weight"
+                  :value="formatWeight(set.weight, weightUnit)"
                   @input="handleSetChange($event, set, 'weight')"
                   placeholder="0"
                 />
@@ -153,8 +155,10 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, PropType } from "vue";
+import { defineComponent, PropType, computed } from "vue";
+import { useStore } from "vuex";
 import { PlannedExercise, Set } from "@/store";
+import { formatWeight, parseWeight } from "@/utils/weight";
 
 export default defineComponent({
   name: "ExerciseCard",
@@ -182,6 +186,10 @@ export default defineComponent({
     "update-exercise",
   ],
   setup(props, { emit }) {
+    const store = useStore();
+    const weightUnit = computed(() => store.getters.userSettings.weightUnit);
+    const weightUnitLabel = computed(() => weightUnit.value);
+
     const isSetLocked = (sets: Set[] | undefined, index: number) => {
       if (!sets || index === 0) {
         return false;
@@ -195,7 +203,11 @@ export default defineComponent({
       field: "weight" | "reps"
     ) => {
       const value = (event.target as HTMLInputElement).value;
-      const updatedSet = { ...set, [field]: Number(value) };
+      let numericValue: number | null = Number(value);
+      if (field === "weight") {
+        numericValue = parseWeight(value, weightUnit.value);
+      }
+      const updatedSet = { ...set, [field]: numericValue };
       emit("update-set", { exerciseId: props.exercise.id, set: updatedSet });
     };
 
@@ -209,6 +221,9 @@ export default defineComponent({
       isSetLocked,
       handleSetChange,
       handleExerciseChange,
+      weightUnit: weightUnit.value,
+      weightUnitLabel,
+      formatWeight,
     };
   },
 });

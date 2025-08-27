@@ -50,6 +50,7 @@ import { defineComponent, computed } from "vue";
 import { useStore } from "vuex";
 import { TrainingRecord } from "@/store";
 import { Bar, Line } from "vue-chartjs";
+import { KG_TO_LB } from "@/utils/weight";
 import {
   Chart as ChartJS,
   Title,
@@ -86,6 +87,10 @@ export default defineComponent({
 
     const allTrainingHistory = computed<TrainingRecord[]>(
       () => store.getters.allTrainingHistory
+    );
+    const weightUnit = computed(() => store.getters.userSettings.weightUnit);
+    const conversionFactor = computed(() =>
+      weightUnit.value === "kg" ? 1 : KG_TO_LB
     );
 
     const stats = computed(() => {
@@ -132,7 +137,10 @@ export default defineComponent({
             if (exercise.category === "strength" && exercise.sets) {
               exercise.sets.forEach((set) => {
                 if (set.done) {
-                  totalVolume += (set.weight || 0) * (set.reps || 0);
+                  totalVolume +=
+                    (set.weight || 0) *
+                    conversionFactor.value *
+                    (set.reps || 0);
                 }
               });
             }
@@ -147,7 +155,7 @@ export default defineComponent({
           if (exercise.category === "strength" && exercise.sets) {
             exercise.sets.forEach((set) => {
               const exerciseName = exercise.name;
-              const weight = set.weight || 0;
+              const weight = (set.weight || 0) * conversionFactor.value;
               if (
                 !prWeightsData[exerciseName] ||
                 prWeightsData[exerciseName] < weight
@@ -174,7 +182,7 @@ export default defineComponent({
           labels: uniqueDates,
           datasets: [
             {
-              label: "Objętość siłowa (kg)",
+              label: `Objętość siłowa (${weightUnit.value})`,
               backgroundColor: "#007bff",
               data: strengthVolumeData,
             },
@@ -184,7 +192,7 @@ export default defineComponent({
           labels: Object.keys(prWeightsData),
           datasets: [
             {
-              label: "Najwyższy ciężar (kg)",
+              label: `Najwyższy ciężar (${weightUnit.value})`,
               backgroundColor: "#17a2b8",
               data: Object.values(prWeightsData),
             },

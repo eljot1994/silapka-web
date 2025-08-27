@@ -96,7 +96,8 @@
                 <ul>
                   <li v-if="type.category === 'strength' && type.lastUsedSets">
                     Serie: {{ type.lastUsedSets.length }}, Max ciężar:
-                    {{ getMaxWeight(type.lastUsedSets) }} kg
+                    {{ formatWeight(getMaxWeight(type.lastUsedSets)) }}
+                    {{ weightUnitLabel }}
                   </li>
                   <li
                     v-if="type.category === 'cardio' && type.lastUsedDuration"
@@ -131,7 +132,11 @@
                   </li>
                   <li v-if="getStats(type.id).category === 'strength'">
                     Rekordowy ciężar:
-                    {{ getStats(type.id).maxWeight || "-" }} kg
+                    <span v-if="getStats(type.id).maxWeight">
+                      {{ formatWeight(getStats(type.id).maxWeight) }}
+                      {{ weightUnitLabel }}
+                    </span>
+                    <span v-else>-</span>
                   </li>
                   <li v-if="getStats(type.id).category === 'strength'">
                     Łącznie serii: {{ getStats(type.id).totalSets || "-" }}
@@ -164,14 +169,16 @@
 <script lang="ts">
 import { defineComponent, ref, computed } from "vue";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
 import { ExerciseType, SessionSet, TrainingRecord } from "@/store";
+import { formatWeight as formatWeightUtil } from "@/utils/weight";
 
 export default defineComponent({
   name: "ExerciseTypesView",
   setup() {
     const store = useStore();
-    const router = useRouter();
+    const weightUnitLabel = computed(
+      () => store.getters.userSettings.weightUnit
+    );
 
     const partieMiesniowe = ref([
       "Klatka piersiowa",
@@ -312,6 +319,9 @@ export default defineComponent({
       editType,
       cancelEdit,
       deleteType,
+      weightUnitLabel,
+      formatWeight: (w: number | null) =>
+        formatWeightUtil(w, weightUnitLabel.value),
     };
   },
 });

@@ -13,6 +13,13 @@
           v-model.number="settings.restDuration"
         />
       </div>
+      <div class="form-group">
+        <label for="weight-unit">Jednostka ciężaru</label>
+        <select id="weight-unit" v-model="settings.weightUnit">
+          <option value="kg">Kilogramy (kg)</option>
+          <option value="lb">Funty (lb)</option>
+        </select>
+      </div>
       <button type="submit" class="action-button primary">Zapisz zmiany</button>
     </form>
   </div>
