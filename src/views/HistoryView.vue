@@ -30,7 +30,8 @@
           class="exercise-details-summary"
         >
           <span v-for="(set, index) in exercise.sets" :key="set.id">
-            {{ index + 1 }}. {{ set.weight || 0 }}kg x {{ set.reps || 0 }} powt.
+            {{ index + 1 }}. {{ formatWeight(set.weight)
+            }}{{ weightUnitLabel }} x {{ set.reps || 0 }} powt.
             {{ set.done ? "(wyk.)" : "(niewyk.)" }}<br />
           </span>
         </span>
@@ -49,6 +50,7 @@ import { defineComponent, computed } from "vue";
 import { useStore } from "vuex";
 import { TrainingRecord } from "@/store";
 import { parseDate } from "@/utils/date";
+import { formatWeight as formatWeightUtil } from "@/utils/weight";
 import TrainingListView from "@/components/TrainingListView.vue";
 
 export default defineComponent({
@@ -58,6 +60,10 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
+
+    const weightUnitLabel = computed(
+      () => store.getters.userSettings.weightUnit
+    );
 
     const sortedTrainingHistory = computed<TrainingRecord[]>(() => {
       return [...store.getters.allTrainingHistory].sort((a, b) => {
@@ -76,6 +82,9 @@ export default defineComponent({
     return {
       sortedTrainingHistory,
       deleteTraining,
+      formatWeight: (w: number | null) =>
+        formatWeightUtil(w, weightUnitLabel.value),
+      weightUnitLabel,
     };
   },
 });

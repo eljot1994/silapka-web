@@ -75,6 +75,7 @@ export interface LastTrainedParties {
 }
 interface UserSettings {
   restDuration: number;
+  weightUnit: "kg" | "lb";
 }
 interface State {
   currentUser: User | null;
@@ -113,6 +114,9 @@ function removeUndefined(obj: any): any {
   return obj;
 }
 
+const defaultWeightUnit =
+  (localStorage.getItem("weightUnit") as "kg" | "lb") || "kg";
+
 const store = createStore<State>({
   state: {
     currentUser: null,
@@ -132,6 +136,7 @@ const store = createStore<State>({
     trainingTimerInterval: null,
     userSettings: {
       restDuration: 120,
+      weightUnit: defaultWeightUnit,
     },
   },
 
@@ -290,6 +295,7 @@ const store = createStore<State>({
     },
     SET_USER_SETTINGS(state, settings: UserSettings) {
       state.userSettings = settings;
+      localStorage.setItem("weightUnit", settings.weightUnit);
     },
   },
 
@@ -397,7 +403,11 @@ const store = createStore<State>({
           trainingHistory: [],
           trainingTemplates: [],
           lastTrainedParties: {},
-          userSettings: { restDuration: 120 },
+          userSettings: {
+            restDuration: 120,
+            weightUnit:
+              (localStorage.getItem("weightUnit") as "kg" | "lb") || "kg",
+          },
         });
         await setDoc(userRef, userData);
         commit("SET_USER", { uid: res.user.uid, email: res.user.email });
@@ -426,7 +436,10 @@ const store = createStore<State>({
       commit("SET_TRAINING_TEMPLATES", []);
       commit("SET_TRAINING_ACTIVE", false);
       commit("SET_LAST_TRAINED_PARTIES", {});
-      commit("SET_USER_SETTINGS", { restDuration: 120 });
+      commit("SET_USER_SETTINGS", {
+        restDuration: 120,
+        weightUnit: (localStorage.getItem("weightUnit") as "kg" | "lb") || "kg",
+      });
     },
     async fetchUserData({ commit, state }) {
       if (state.currentUser) {
@@ -441,7 +454,11 @@ const store = createStore<State>({
           commit("SET_LAST_TRAINED_PARTIES", data.lastTrainedParties || {});
           commit(
             "SET_USER_SETTINGS",
-            data.userSettings || { restDuration: 120 }
+            data.userSettings || {
+              restDuration: 120,
+              weightUnit:
+                (localStorage.getItem("weightUnit") as "kg" | "lb") || "kg",
+            }
           );
         }
       }

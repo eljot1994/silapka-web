@@ -15,8 +15,8 @@
           <strong>{{ exercise.name }}</strong>
           <ul v-if="exercise.sets && exercise.sets.length" class="set-list">
             <li v-for="(set, index) in exercise.sets" :key="set.id">
-              Seria {{ index + 1 }}: {{ set.weight || 0 }}kg x
-              {{ set.reps || 0 }} powt.
+              Seria {{ index + 1 }}: {{ formatWeight(set.weight) }}
+              {{ weightUnitLabel }} x {{ set.reps || 0 }} powt.
             </li>
           </ul>
           <p v-else-if="exercise.duration">
@@ -37,6 +37,7 @@ import { defineComponent, computed } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { TrainingRecord } from "@/store";
+import { formatWeight as formatWeightUtil } from "@/utils/weight";
 
 export default defineComponent({
   name: "TrainingSummaryView",
@@ -44,6 +45,9 @@ export default defineComponent({
     const store = useStore();
     const route = useRoute();
     const router = useRouter();
+    const weightUnitLabel = computed(
+      () => store.getters.userSettings.weightUnit
+    );
     const trainingId = route.params.id as string;
 
     const training = computed<TrainingRecord | undefined>(() =>
@@ -59,6 +63,9 @@ export default defineComponent({
     return {
       training,
       goToHistory,
+      weightUnitLabel,
+      formatWeight: (w: number | null) =>
+        formatWeightUtil(w, weightUnitLabel.value),
     };
   },
 });
